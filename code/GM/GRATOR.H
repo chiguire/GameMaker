@@ -1,6 +1,10 @@
 #include "gen.h"
 #include "coord2d.hpp"
+#ifdef GM_PORT
+uint StrInBuf(char *str,char *Buf,int Blen);   // defined static in GRATOR.C; not linked into the port
+#else
 static uint StrInBuf(char *str,char *Buf,int Blen);
+#endif
 
 typedef uchar Pixel;
 
@@ -257,4 +261,4 @@ class GameClass
   };
 
 // End of Grator.h Header file
-
+

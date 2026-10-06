@@ -180,14 +180,14 @@ int ParseFile(const char *in,char *name,char *path)
 
 #pragma loop_opt(on)
 
-void GetScrn(char far *mem)
+void GetScrn(void far *mem)
   {
-  memcpy(mem,(void far *) 0x0A0000000, (unsigned) 64000);
+  memcpy(mem,MK_FP(0xA000,0), (unsigned) 64000);
   }
 
-void RestoreScrn(char far *mem)
+void RestoreScrn(void far *mem)
   {
-  memcpy((void far *) 0xA0000000,mem,(unsigned) 64000);
+  memcpy(MK_FP(0xA000,0),mem,(unsigned) 64000);
   }
   
 #pragma loop_opt(off)
@@ -195,7 +195,7 @@ void RestoreScrn(char far *mem)
 int DisplayHelpFile(char *filename)
   {
   FILE *fp;
-  uchar far *addr = (unsigned char far *) 0xB8000000;
+  uchar far *addr = (unsigned char far *) MK_FP(0xB800,0);
   uint l;
   char ch;
 
@@ -315,4 +315,4 @@ void swap(int *v1,int *v2)
   *v1=*v2;
   *v2=v3;
   }
-
+

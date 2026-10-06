@@ -48,8 +48,10 @@
 extern int mouinstall;
 
 // Needed definitions from "time.h"
+#ifndef GM_PORT
 typedef long time_t;
 time_t   _Cdecl time(time_t _FAR *__timer);
+#endif
 
 //#define DEBUG   printf
 //#define DEBUGPRT(x)
@@ -149,7 +151,7 @@ static boolean MonEndPath(int MMnum,int MONnum);
 
 typedef struct
   {
-  long int score;
+  long score;
   unsigned char  *savetop;     // save space for behind the top of the character
   unsigned char  *savebottom;  // save space for behind the bottom of the char
   char update;
@@ -165,7 +167,7 @@ typedef struct
   int gravx,gravy;    // Current velocity due to gravity
   int hitpts;         // Current # of hitpoints the char has
   int lives;          // Current # of lives -1 = game over
-  unsigned long int NextAni; // Next time to move the character
+  unsigned long NextAni; // Next time to move the character
   unsigned char inv[MAXINV]; // Array of inventory items gathered
   int meter[MAXSEQ+10];      // Repetition counters
   char seqon[MAXSEQ];
@@ -273,6 +275,15 @@ class Recording
 Recording        *Rec;
 #endif RECORDER
 
+#ifdef FRAMEDUMP
+// FRAMEDUMP builds replay recordings on a deterministic clock.  While playscene's main loop runs, the
+// timer interrupt (NewTimer) stops advancing time and the loop advances it by exactly one game tick per
+// pass.  Between scenes the real timer runs (loading takes wall-clock time), so each playscene starts
+// from DetSndClock, the value the previous scene ended with, and not from whatever the timer reached.
+static char    DetClock=0;
+static ulongi  DetSndClock=1;
+#endif
+
 GameClass        Game;
 monstruct       *mon                = NULL;
 minfo           *mi                 = NULL;
@@ -280,7 +291,15 @@ BlkMonStruct    *BlkMon             = NULL;   // Next time to birth monster for 
 blkstruct       *blks[3]            = {NULL,NULL,NULL};   // addresses - Backgnd[0],mon[1],char[2]
 monmapstruct     mm        [LASTMM];
 sndstruct        snd       [LASTSND];
+#if defined(GM_PORT) || defined(FRAMEDUMP)
+// One row more than the game uses.  For a monster on the last map row the engine reads map[MLEN][..]; in
+// DOS that is whatever follows the array in memory (the start of the data segment: the Borland banner
+// text and some pointers, whose "monster index" bytes made monsters collide with phantom monsters).  The
+// extra row is filled with "no monster" (see main) so the behaviour is defined and repeatable.
+mapstruct far    map       [MLEN+1][MWID];
+#else
 mapstruct far    map       [MLEN][MWID];
+#endif
 char             DigiSnd   [LASTSND][9];
 RGBdata          colors    [256];
 ScrollStruct     scroll;
@@ -376,7 +395,7 @@ static int     BresenhamScroll(BresScroll *b,int speed);
 
 static void    DoFunKy      (int keynum);
 static ulongi  LoadGame     (void);
-static void    SaveGame     (unsigned long int SndTimeSaved);
+static void    SaveGame     (unsigned long SndTimeSaved);
 static boolean Display_File (char *filen,Pixel col,uint PauseTime=32000);
 static void    GMabout      (void);
 static void    HelpFiles    (void);
@@ -461,8 +480,8 @@ static void FastTimer(void);
 
 static char HandleJStick(int fn); // 0=handle, RESETTIMER=reset internal clock
 
-extern int  CheckHighScores(char *gamename,long int score);
-extern void ShowHighScores (char *gamename,long int score=-1);
+extern int  CheckHighScores(char *gamename,long score);
+extern void ShowHighScores (char *gamename,long score=-1);
 
 
 static void StartSceneInits(Coord2d StartPosition);
@@ -597,7 +616,11 @@ QuitCodes main(int argc,char *argv[])
 #endif
 #endif
 
+#ifdef FRAMEDUMP
+  srand(1);           // Oracle runs: fixed seed so DOS and port see the same random numbers
+#else
   randomize();
+#endif
   initmouse();
   TextMode();
         // Show the video BIOS area
@@ -639,7 +662,7 @@ QuitCodes main(int argc,char *argv[])
 
   if ((!LoadConfigData(&cs))
       ||(strcmpi((const char *) cs.SndDrvr,"NotInit")==0)
-      ||((argc>0)&&(strncmpi(argv[1],"config",6)==0)))
+      ||((argc>1)&&(strncmpi(argv[1],"config",6)==0)))   // was argc>0: argv[1] is NULL with no arguments
     {
     GraphMode();
     if (AskConfigData(&cs)) SaveConfigData(&cs);
@@ -655,10 +678,16 @@ QuitCodes main(int argc,char *argv[])
   #endif
   if (cs.ForceVGA==NoType) Identify_VGA();
   else Force_VGA(cs.ForceVGA);
+#ifdef FRAMEDUMP
+  Force_VGA(SoftwareSim);   // Oracle runs use the software scroll path, the only one the port has.
+#endif
 
   PauseTimeKey(2);
   TextMode();
-  
+
+#if defined(GM_PORT) || defined(FRAMEDUMP)
+  for (int oc=0;oc<MWID;oc++) { map[MLEN][oc].blk=0; map[MLEN][oc].mon=0xFF; }   // row past the end: no monsters
+#endif
   initalldata();
   atexit(cleanup);
 
@@ -689,17 +718,23 @@ QuitCodes main(int argc,char *argv[])
       do
         {
         TempFname[0]=0;
+#ifdef FRAMEDUMP
+        if (argc>2) strcpy(TempFname,argv[2]); else
+#endif
         if (!getfname(5,5,"Enter game to play: ","*.gam\0",TempFname)) return(menu);
         if (!ParseFileName(TempFname,gamename,WorkDir)) return(menu);
         *FileExt(gamename) = 0;
         } while (gamename[0]==0);
       if (!Game.Load(TempFname))
         {
-        errorbox("Incorrect Data File Version (You are running Game-Maker Version "GMVER").","To correct, load this game into the integrator, and then save it.");
+        errorbox("Incorrect Data File Version (You are running Game-Maker Version " GMVER").","To correct, load this game into the integrator, and then save it.");
         return(menu);
         }
       DoGame();
       TextMode();
+#ifdef FRAMEDUMP
+      if (argc>2) return(quit);        // Non-interactive oracle run: done.
+#endif
       choice++;
       }
     else if (choice==2)
@@ -731,7 +766,7 @@ QuitCodes main(int argc,char *argv[])
     if (w==NULL) w = new char [2000];
     attr = openmenu(30,5,20,7,w);
     moucur(FALSE);
-    writestr(30,5,attr+PGMTITLECOL, " PLAYGAME     V"GMVER" ");
+    writestr(30,5,attr+PGMTITLECOL, " PLAYGAME     V" GMVER" ");
     writestr(30,6,attr+PGMTITLECOL, "  By Gregory Stone  ");
     writestr(30,7,attr+PGMTITLECOL, " Copyright(C) 1994  ");
     writestr(31,9, attr+14, " Play a Game!");
@@ -1327,6 +1362,79 @@ static boolean ShowGraphic(const char *File,RGBdata *NewCols,int PauseLen)
   return(RetVal);
   }
 
+#ifdef FRAMEDUMP
+/*---------------------------------------------------------------------*/
+/* Regression oracle for the modern port (build with -DFRAMEDUMP).     */
+/* "playgame <demo.rec> <game.gam>" plays the recording with no menus  */
+/* and appends a frame record to $FDUMP (default FRAMES.BIN) every     */
+/* FDUMPEVERY game ticks, up to FDUMPMAX frames.  Record layout:       */
+/*   "FRM1", long tick, long timer, long score, int scene,             */
+/*   int charx, int chary, uint zeroaddon, int zeropage  (26 bytes)    */
+/*   then 768 bytes of 6-bit VGA palette and 64000 bytes of A000:0.    */
+/*---------------------------------------------------------------------*/
+#define FDUMPEVERY 20
+#define FDUMPMAX   150
+
+static void DumpFrame(void)
+  {
+  static FILE *fp=NULL;
+  static ulongi Tick=0;
+  static int Count=0;
+  static RGBdata Pal[256];
+  long tick,timer,score;
+  int  scene,cx,cy,zpage;
+  uint zadd;
+
+  static FILE *tr=NULL;
+  static int trinit=0;
+
+  Tick++;
+  if (Rec->RecFlag!=PLAYBACK) return;
+  if (!trinit)                       // $FTRACE: one text line per game tick, for tick-level DOS/port diffs
+    {
+    char *tn=getenv("FTRACE");
+    trinit=1;
+    if (tn) tr=fopen(tn,"w");
+    }
+  if (tr)
+    {
+    long monsum=0;
+    int  nmon=0;
+    for (int m=0;m<LASTMM;m++)          // checksum of where every live monster is
+      if (mm[m].monnum<LASTMON)
+        {
+        nmon++;
+        monsum=monsum*31+mi[m].curx[0]*7+mi[m].cury[0]+mi[m].CurPic;
+        }
+    fprintf(tr,"%lu timer=%lu rec=%lu idx=%d pend=%d seq=%d frame=%d x=%d y=%d scene=%d hp=%d lives=%d score=%ld mons=%d/%ld sub=%d,%d grav=%d,%d\n",
+            (unsigned long)Tick,(unsigned long)TimerCounter,(unsigned long)Rec->RecordTimer,
+            Rec->RecIndex,PendCtr,chr.cseq,chr.cframe,chr.x[0],chr.y[0],doscene,
+            ci.hitpts,ci.lives,(long)ci.score,nmon,monsum,chr.x[1],chr.y[1],ci.gravx,ci.gravy);
+    fflush(tr);
+    }
+  if (Tick%FDUMPEVERY) return;
+  if (fp==NULL)
+    {
+    char *name=getenv("FDUMP");
+    fp=fopen(name?name:"FRAMES.BIN","wb");
+    if (fp==NULL) return;
+    }
+  if (Count>=FDUMPMAX) { keydn[1]=1; return; }   // Quit the scene (ESC).
+  Count++;
+  GetAllPal(Pal);
+  tick=Tick; timer=TimerCounter; score=(long)ci.score;
+  scene=doscene; cx=chr.x[0]; cy=chr.y[0]; zadd=zeroaddon; zpage=zeropage;
+  fwrite("FRM1",1,4,fp);
+  fwrite(&tick,sizeof(long),1,fp);   fwrite(&timer,sizeof(long),1,fp);
+  fwrite(&score,sizeof(long),1,fp);  fwrite(&scene,sizeof(int),1,fp);
+  fwrite(&cx,sizeof(int),1,fp);      fwrite(&cy,sizeof(int),1,fp);
+  fwrite(&zadd,sizeof(uint),1,fp);   fwrite(&zpage,sizeof(int),1,fp);
+  fwrite(Pal,sizeof(RGBdata),256,fp);
+  fwrite(MK_FP(0xA000,0),1,64000,fp);
+  fflush(fp);
+  }
+#endif
+
 static int playscene(int dosc,int prev,int &link)
   {
   #define ADJBLOC(a,b) blks[0][blkmap[map[(chr.y[0]+b)%MWID][(chr.x[0]+a)%MLEN].blk]]
@@ -1334,6 +1442,13 @@ static int playscene(int dosc,int prev,int &link)
   int tx,ty;
   int     done     = FALSE;
   int     newlink  = MAXSCENELINKS;
+#ifdef FRAMEDUMP
+  if (Rec->RecFlag==PLAYBACK)
+    {
+    SndClock=DetSndClock;   // Ignore the time the scene load took
+    srand(1+dosc);          // ... and the random numbers that timing-dependent title/fade code consumed
+    }
+#endif
   ulongi  oldSndclk= SndClock;
   ulongi  OldClock = oldSndclk>>3;
   boolean DoScroll = False;
@@ -1348,6 +1463,14 @@ static int playscene(int dosc,int prev,int &link)
   if (blks[0]==NULL) blks[0] = new blkstruct [BACKBL+1];
   if (blks[1]==NULL) blks[1] = new blkstruct [MONBL+1];
   if (blks[2]==NULL) blks[2] = new blkstruct [CHARBL+1];
+#if defined(GM_PORT) || defined(FRAMEDUMP)
+  // The extra entry at the end of each array is the "no block here" sentinel (index BACKBL etc.) that
+  // chkrights() and friends read.  The original never initialises it, so what it holds in DOS is whatever
+  // the far heap contained before.  Make it well defined (all zero: not solid) so runs are repeatable.
+  memset(&blks[0][BACKBL],0,sizeof(blkstruct));
+  memset(&blks[1][MONBL] ,0,sizeof(blkstruct));
+  memset(&blks[2][CHARBL],0,sizeof(blkstruct));
+#endif
 
   /* Clear Screen */
 
@@ -1409,6 +1532,19 @@ static int playscene(int dosc,int prev,int &link)
 /***********************************************/
   while((done==FALSE)&&(newlink==MAXSCENELINKS)) // If <ESC> or end scene, exit
     {                                            // Start of "while" logic
+    #ifdef GM_PORT
+    gm_pump();      // Deliver the timer/keyboard "interrupts" and present the frame
+    #endif
+    #ifdef FRAMEDUMP
+
+    DetClock=(Rec->RecFlag==PLAYBACK);
+    if (DetClock)   // Oracle replay: exactly one game tick (8 scroll units) per pass through the loop
+      {
+      SndClock    = oldSndclk+7;
+      TimerCounter= OldClock+1;
+      DetSndClock = SndClock;
+      }
+    #endif
     #ifdef KEYDEBUG
     char numb[15];
     sprintf(numb,"Keystk:%4d",keystkptr);
@@ -1518,6 +1654,9 @@ static int playscene(int dosc,int prev,int &link)
         ClearDirtyRects();
         }
       else DrawDirtyRects();
+#ifdef FRAMEDUMP
+      DumpFrame();
+#endif
 
       DoScroll=ChangeScroll();    // Recalculate whether we should be scrolling
                                   // or not and the Bresenham's algorithm stuff it we should.
@@ -1527,6 +1666,9 @@ static int playscene(int dosc,int prev,int &link)
     }
 
 /*************************************************************/
+#ifdef FRAMEDUMP
+  DetClock=0;
+#endif
 /*      Exit main "playscene" loop here, then clean up       */
 /*************************************************************/
   StopSong();
@@ -1905,7 +2047,7 @@ static void GMabout(void)
   Box(15,15,305,185,Blue);
   while (GetKey(1)) GetKey(0);
   GWrite(40,40,Yellow,"      G A M E - M A K E R");
-  GWrite(40,48,Yellow,"          Version "GMVER"   ");
+  GWrite(40,48,Yellow,"          Version " GMVER"   ");
   GWrite(40,64,Yellow,"Recreational Software Designs");
   GWrite(40,72,Yellow,"Box 1163,  Amherst, NH, 03031");
   GWrite(40,88,Yellow,"This game was made with GAME-");
@@ -2144,7 +2286,7 @@ static char DropBloc(void)
   register int k,j;
   char chosen;
   int x,y,keytyp;
-  unsigned long int ClockPause;
+  unsigned long ClockPause;
 
   ClockPause=clock;                   // Save so no time passes when fn key hit.
   setvect(0x9,OldKbd);                // Reset old keyboard handler address
@@ -2539,7 +2681,7 @@ static boolean movechars(void)
 
     GetTouchbl(&t);
     retval=chksolids(tx,0,&t);
-    OnGround(retval); 
+    OnGround(retval);
     #ifdef SOLDEBUG    
     Gwritestr(1,12,25,"     ",5);
     Gwritestr(1,11,25,"    ",4);
@@ -2572,8 +2714,8 @@ static boolean movechars(void)
     chkmapbounds();
     GetTouchbl(&t);
     retval=chksolids(0,ty,&t);
-    OnGround(retval); 
-  
+    OnGround(retval);
+
     if (retval&SOLBOT)  // Bottom
       {
       #ifdef SOLDEBUG    
@@ -2747,8 +2889,8 @@ static int ChkMonChr(int MMnum)
     #endif
     if ( (mons=MonPicNum(MMnum))>=MONBL) return(FALSE);
     retval=0;
-    if (CHRFRAME.pic2<CHARBL) retval=PicChkTouch(Chr.x,Chr.y,(char*)blks[2][CHRFRAME.pic2].p,Mon.x,Mon.y,(char*)blks[1][mons].p);
-    if (CHRFRAME.pic1<CHARBL) retval|=PicChkTouch(Chr.x,Chr.y,(char*)blks[2][CHRFRAME.pic1].p,Mon.x,Mon.y+BLEN,(char*)blks[1][mons].p);
+    if (CHRFRAME.pic2<CHARBL) retval=PicChkTouch(Chr.x,Chr.y,(unsigned char*)blks[2][CHRFRAME.pic2].p,Mon.x,Mon.y,(unsigned char*)blks[1][mons].p);
+    if (CHRFRAME.pic1<CHARBL) retval|=PicChkTouch(Chr.x,Chr.y,(unsigned char*)blks[2][CHRFRAME.pic1].p,Mon.x,Mon.y+BLEN,(unsigned char*)blks[1][mons].p);
     if (retval)
       {
       mons=blks[1][mons].solid;
@@ -3537,7 +3679,7 @@ static char really_checktouch(int x,int y,unsigned char bnum)
         if (onscrn(x,y,&Tmp))
           {
           map[y][x].blk=blks[0][bnum].touchbl;          // Update in mem
-          BufDrawBlk(Tmp.x,Tmp.y,(char*)blks[0][blkmap[blks[0][bnum].touchbl]].p);
+          BufDrawBlk(Tmp.x,Tmp.y,(unsigned char*)blks[0][blkmap[blks[0][bnum].touchbl]].p);
           AddDirtyRect(Tmp.x,Tmp.y,Tmp.x+BLEN-1,Tmp.y+BLEN-1);
           }
         }
@@ -3728,7 +3870,7 @@ static void OnGround(int Solid)
 
 static int MoveCharGrav(int fn)
   {
-  static unsigned long int gclk=1;
+  static unsigned long gclk=1;
   int retval=FALSE;
   int tempx=0;
   int tempy=0;
@@ -3863,7 +4005,7 @@ static void Sdrawspbloc(int x,int y,char dir,blkstruct *b)
   register int j,k;
 
   AddDirtyRect(x,y,x+BLEN-1,y+BLEN-1);
-  BufDrawSpBlk(x,y,dir,(char*)b->p);
+  BufDrawSpBlk(x,y,dir,(unsigned char*)b->p);
 
 /*
   for (j=0;j<BLEN;j++)
@@ -3974,7 +4116,7 @@ static void DrawScroll(int speed)
   union
     {
     unsigned char c[4];
-    unsigned long int li;
+    unsigned long li;
     unsigned int i[2];
     } wb;  
 
@@ -4420,6 +4562,13 @@ static char HandleJStick(int fn)
 
 static void interrupt NewTimer(...)
   {
+#ifdef FRAMEDUMP
+  if (DetClock)
+    {
+    outportb(0x20,0x20);    // Just acknowledge the interrupt; time is advanced by playscene.
+    return;
+    }
+#endif
   if ((SndClock&7)==0)
     { 
     (*OldTimer)();
@@ -4755,7 +4904,7 @@ static void StartSceneInits(Coord2d Start)
 
 static void ShowVidMem(void)
   {
-  char far *memspot = (char far *) 0xC0000000;
+  char far *memspot = (char far *) MK_FP(0xC000,0);
   int l=0;  
   int done=0;
   char s[81];
@@ -5078,7 +5227,7 @@ static int AskConfigData(ConfigStruct *cs)
          else if (Vga==8) cs->ForceVGA=ATIWonder;
          else if (Vga==7) cs->ForceVGA=ATI;
          else if (Vga==9) cs->ForceVGA=SoftwareSim;
-         else if (Vga>=2) cs->ForceVGA=Paradise+(Vga-((VideoCards)2));
+         else if (Vga>=2) cs->ForceVGA=(VideoCards)(Paradise+(Vga-((VideoCards)2)));
          if (cs->SndInt==1) cs->SndInt=2;   // Translate interrupts from an
          if (cs->SndInt==9) cs->SndInt=10;  // even count to the real value.
          return(TRUE);
@@ -5219,3 +5368,11 @@ uint GameClass::CreateScene(int x,int y) { return(NOSCENE); }
 */
 
 
+
+#ifdef GM_PORT
+// Entry used by the port (gmplay_main.cpp): main() is renamed gm_game_main by shim/gmcompat.h
+extern "C" int32_t gm_main_entry(int32_t argc, char **argv)
+  {
+  return (int32_t) gm_game_main((short)argc, argv);
+  }
+#endif

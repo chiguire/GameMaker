@@ -8,7 +8,7 @@
 #include <conio.h>
 #include "gen.h"
 #include "debug.hpp"
-#include "fileclss.hpp"
+#include <fileclss.hpp>   // <> so the DRV version is found first, as with the Borland include rules
 #include "viddrive.hpp"
 
 //#define STANDALONE
@@ -33,7 +33,7 @@ for faster DMA.
 
 typedef struct
   {
-  long int   Size;
+  long   Size;
   ChunkTypes Type;
   } ChunkHeader;
 
@@ -156,7 +156,7 @@ void DoRunLength(char *Data,VideoMode *Vid,Coord2d Start)
       if (PacketLen<=0)
         {
         PacketLen*=-1;
-        Vid->RepCols (Start+Pos,PacketLen,Data,Vid);
+        Vid->RepCols (Start+Pos,PacketLen,(Pixel*)Data,Vid);
         sprintf(LogStr,"RepCols((%d,%d),%d)\n",(Start+Pos).x,(Start+Pos).y,PacketLen);
         LOG(LogStr);
         Data+=PacketLen;
@@ -206,7 +206,7 @@ static void DoLineCompress(char *Data,VideoMode *Vid,Coord2d Pos)
       Data+=2;
       if (PacketLen>=0)
         {
-        Vid->RepCols(Pos+MakeCoord2d(x,Lines),PacketLen,Data,Vid);
+        Vid->RepCols(Pos+MakeCoord2d(x,Lines),PacketLen,(Pixel*)Data,Vid);
         Data+=PacketLen;
         x+=PacketLen;
         }
@@ -267,8 +267,9 @@ boolean FrameHeader::View(FLIHeader &H,FileRead &f,VideoMode *Vid,Coord2d Pos)
            DEBUG("Copy\n");
            {
 //           f.Get(((void *)0xA0000000),64000);
-           uchar *Pixels = f.Peek(64000);
-           memcpy(((void *)0xA0000000),Pixels,64000);
+           uint CopyLen = 64000;
+           uchar *Pixels = f.Peek(CopyLen);
+           memcpy(MK_FP(0xA000,0),Pixels,64000);
            f.Skip(64000);
            }
            break;

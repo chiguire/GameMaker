@@ -40,7 +40,7 @@ boolean FileRead::Open(char *fname)
 uchar* FileRead::Peek(uint &Bytes)
     {
     DEBUG("Peek\n");
-    if (idx+((long int)Bytes)>=End)
+    if (idx+((long)Bytes)>=End)
       {
 //      if (idx+Bytes>=blen)
 //        {
@@ -57,7 +57,7 @@ uchar* FileRead::Peek(uint &Bytes)
         if (idx>End) EOFflag=True;
         }
 */
-      if (idx+((long int)Bytes)>End) { Bytes=End-idx; if (Bytes==0) EOFflag=True; }
+      if (idx+((long)Bytes)>End) { Bytes=End-idx; if (Bytes==0) EOFflag=True; }
       }
     return(buf+idx);
     }
@@ -116,4 +116,4 @@ void FileWrite::Close(void)
     }
 
 
-
+

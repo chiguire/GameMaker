@@ -34,8 +34,6 @@ class Coord2d
 
   friend boolean operator >  (Coord2d a,Coord2d b)
     { return((boolean)((a.x>b.x)&&(a.y>b.y))); }
-  friend boolean operator &>  (Coord2d a,Coord2d b)
-    { return((boolean)((a.x>b.x)&&(a.y>b.y))); }
 
   friend boolean operator <  (Coord2d a,Coord2d b)
     { return((boolean)((a.x<b.x)&&(a.y<b.y))); }
@@ -140,4 +138,4 @@ inline Box2d   MakeBox2d (Coord2d ul,Coord2d lr)     { Box2d r(ul,lr);     retur
 
 #endif
 
-
+
