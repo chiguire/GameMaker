@@ -68,6 +68,16 @@ static void invalid_parameter(const wchar_t *, const wchar_t *, const wchar_t *,
     ExitProcess(4);
 }
 
+// GM_EXITTRACE=1: print who called exit() (the stack is still intact inside an atexit handler).
+static void trace_exit()
+{
+    init_symbols();
+    fprintf(stderr, "\n*** exit() called from:\n");
+    CONTEXT ctx = {};
+    RtlCaptureContext(&ctx);
+    print_stack(GetCurrentThread(), ctx);
+}
+
 static HANDLE main_thread;
 
 static DWORD WINAPI watchdog(LPVOID)
@@ -95,6 +105,7 @@ int main(int argc, char *argv[])
 #ifdef _WIN32
     SetUnhandledExceptionFilter(crash_filter);
     _set_invalid_parameter_handler(invalid_parameter);
+    if (getenv("GM_EXITTRACE")) atexit(trace_exit);
     DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(), &main_thread, 0, FALSE, DUPLICATE_SAME_ACCESS);
     if (getenv("GM_WATCHDOG")) CreateThread(NULL, 0, watchdog, NULL, 0, NULL);
 #endif

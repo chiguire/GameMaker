@@ -6,6 +6,7 @@
  */
 #include "dosplat.h"
 #include "fb.h"
+#include "audio.h"
 #include "font8x8.h"
 #include <raylib.h>
 #include <math.h>
@@ -383,6 +384,7 @@ void gm_pump(void)
     if (GetTime() - last_present >= 1.0 / 60.0) present();
     poll_keys();
     type_keys();
+    gm_audio_pump();
     fire_timer();
 }
 
@@ -520,8 +522,8 @@ void gm_delay(uint32_t ms)
     do { gm_pump(); WaitTime(0.001); } while (GetTime() < end);
 }
 
-void gm_sound(uint16_t hz) { (void)hz; }   /* PC speaker: silent for now */
-void gm_nosound(void) {}
+void gm_sound(uint16_t hz) { gm_speaker(hz); }       /* PC speaker */
+void gm_nosound(void) { gm_speaker(0); }
 
 
 /* ---------------------------------------------------------------------------------------------
@@ -535,4 +537,12 @@ int16_t gm_rand(void)
 {
     rand_seed = (int32_t)((uint32_t)rand_seed * 0x015A4E35u + 1u);       /* 32-bit wraparound */
     return (int16_t)((rand_seed >> 16) & 0x7FFF);
+}
+
+uint32_t gm_farsize(const void *p)
+{
+    uint32_t off = (uint32_t)((const uint8_t *)p - gm_dosmem);
+    for (int i = 0; i < nblocks; i++)
+        if (blocks[i].off == off && blocks[i].used) return blocks[i].size;
+    return 0;
 }

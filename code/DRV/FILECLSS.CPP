@@ -47,7 +47,8 @@ uchar* FileRead::Peek(uint &Bytes)
         uint LeftOver = End-idx;
 //        memcpy(buf,buf+idx,LeftOver);  // Bombs w/ gif.
         for (uint t=0;t<LeftOver;t++) buf[t]=buf[t+idx];
-        End=LeftOver+fread(buf+LeftOver,sizeof(uchar),((uint)blen)-LeftOver,fp);
+        // fp is NULL once Open() has read the whole file; nothing more to read then (as in LoadMore()).
+        End=LeftOver+((fp!=NULL) ? fread(buf+LeftOver,sizeof(uchar),((uint)blen)-LeftOver,fp) : 0);
         if (End==0) EOFflag=True;
         idx=0;
 //        }

@@ -21,6 +21,7 @@ extern uint8_t gm_dosmem[GM_DOSMEM_SIZE];
 void    *gm_farmalloc(uint32_t bytes);
 void     gm_farfree(void *p);
 uint32_t gm_farcoreleft(void);
+uint32_t gm_farsize(const void *p);          /* size of an allocation made by gm_farmalloc (0 if unknown) */
 uint16_t gm_fp_seg(const void *p);
 uint16_t gm_fp_off(const void *p);
 
