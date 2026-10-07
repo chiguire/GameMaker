@@ -72,13 +72,16 @@ extern "C" char KeyBoardOn(void)
 extern "C" char MicroChannel(void) { return 0; }   // never a Micro Channel bus
 
 /* ---------------------------------------------------------------------------------------------
- * Joystick: no game port is reported (the port reads 0xFF), so all three values come back -1.
+ * Joystick: the first gamepad stands in for the game-port stick (positions 0..200, centre 100, two buttons; see
+ * gm_joystick_read). Without a gamepad the stick simply sits idle in the centre.
  * ------------------------------------------------------------------------------------------- */
 extern "C" void ReadJoyStick(unsigned int far *x, unsigned int far *y, unsigned int far *butn)
   {
-  *butn = 0xFFFF;
-  *x = 0xFFFF;
-  *y = 0xFFFF;
+  int32_t jx, jy, jb;
+  gm_joystick_read(&jx,&jy,&jb);
+  *x = (unsigned int)jx;
+  *y = (unsigned int)jy;
+  *butn = (unsigned int)jb;
   }
 
 /* ---------------------------------------------------------------------------------------------

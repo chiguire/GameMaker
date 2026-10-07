@@ -134,7 +134,11 @@ int ParseFileName(const char *in,char *name,char *path)
     {
     path[pathctr]=in[l];
     name[namectr]=in[l];
+#ifdef GM_PORT
+    if ((in[l]=='\\')||(in[l]=='/'))     // either separator
+#else
     if (in[l]=='\\')
+#endif
       {
       LastSlash=pathctr;
       namectr=-1;
@@ -161,7 +165,11 @@ int ParseFile(const char *in,char *name,char *path)
     {
     path[pathctr]=in[l];
     name[namectr]=in[l];
+#ifdef GM_PORT
+    if ((in[l]=='\\')||(in[l]=='/'))     // either separator
+#else
     if (in[l]=='\\')
+#endif
       {
       LastSlash=pathctr;
       namectr=-1;

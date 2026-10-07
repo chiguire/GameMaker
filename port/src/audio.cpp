@@ -34,6 +34,9 @@ constexpr uint32_t RING = 1u << 15;
 int16_t g_ring[RING];
 uint64_t g_rd, g_wr;                 /* monotonic counts; index = count % RING */
 
+int  g_volume = 100;                 /* master volume 0..100, applied where samples go to the device */
+bool g_mute;
+
 uint64_t g_synth_pos;                /* samples synthesised so far */
 constexpr double LATENCY = 1536;     /* samples the synthesis clock runs ahead of the wall clock */
 constexpr uint32_t MAX_CATCHUP = 8192;
@@ -123,13 +126,14 @@ void wav_write(const int16_t *s, uint32_t n)
 
 /* ---- raylib device --------------------------------------------------------------------------------- */
 AudioStream g_stream;
-bool g_device_tried, g_device_ok;
+bool g_device_tried, g_device_ok, g_headless;
 constexpr int CHUNK = 1024;
 
 void ensure_device()
 {
     if (g_device_tried) return;
     g_device_tried = true;
+    if (g_headless) return;                       /* test mode: samples are only captured (GM_WAV) */
     SetTraceLogLevel(LOG_WARNING);
     InitAudioDevice();
     if (!IsAudioDeviceReady()) { std::fprintf(stderr, "audio: no output device, running silent\n"); return; }
@@ -213,10 +217,18 @@ void gm_audio_pump(void)
         int16_t chunk[CHUNK];
         uint32_t got = gm_audio_drain(chunk, CHUNK);
         if (got < CHUNK) std::memset(chunk + got, 0, (CHUNK - got) * sizeof(int16_t));   /* underrun: silence */
+        wav_write(chunk, CHUNK);                                  /* captures keep the unscaled mix */
+        float g = g_mute ? 0.0f : (float)(g_volume * g_volume) / 10000.0f;   /* squared: loudness follows the slider */
+        if (g != 1.0f) for (uint32_t i = 0; i < CHUNK; i++) chunk[i] = (int16_t)(chunk[i] * g);
         UpdateAudioStream(g_stream, chunk, CHUNK);
-        wav_write(chunk, CHUNK);
     }
 }
+
+void gm_audio_set_headless(int on) { g_headless = on != 0; }
+void gm_audio_set_volume(int pct) { g_volume = pct < 0 ? 0 : (pct > 100 ? 100 : pct); }
+int  gm_audio_volume(void) { return g_volume; }
+void gm_audio_set_mute(int on) { g_mute = on != 0; }
+int  gm_audio_muted(void) { return g_mute; }
 
 void gm_opl_write(uint8_t reg, uint8_t value)
 {

@@ -32,6 +32,14 @@ void gm_speaker(uint16_t hz);
 int  gm_voc_play(const uint8_t *data, uint32_t size);
 void gm_pcm_stop(void);
 
+/* Master volume (0..100, default 100) and mute. They scale what goes to the audio device only; a GM_WAV capture
+ * always holds the unscaled mix. */
+void gm_audio_set_volume(int pct);
+int  gm_audio_volume(void);
+void gm_audio_set_mute(int on);
+int  gm_audio_muted(void);
+void gm_audio_set_headless(int on);       /* never open an audio device (GM_HEADLESS test mode); GM_WAV still captures */
+
 /* Offline use (tests, tools): drive the mixer from a manual clock and collect samples instead of using a device. */
 void     gm_audio_manual_clock(int on);
 void     gm_audio_advance(double seconds);

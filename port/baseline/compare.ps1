@@ -17,6 +17,7 @@ param(
     [string]$Tag = ''                # same value as for run_baseline.ps1
 )
 $ErrorActionPreference = 'Stop'
+$env:GM_NO_SETTINGS = '1'   # a person's saved window/volume settings must not change a test
 $root = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 $exe = Join-Path $root 'port\build\gmplay.exe'
 $fdump = Join-Path $root 'port\build\fdump.exe'

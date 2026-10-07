@@ -151,7 +151,7 @@ static boolean MonEndPath(int MMnum,int MONnum);
 
 typedef struct
   {
-  long score;
+  gm_long score;
   unsigned char  *savetop;     // save space for behind the top of the character
   unsigned char  *savebottom;  // save space for behind the bottom of the char
   char update;
@@ -167,7 +167,7 @@ typedef struct
   int gravx,gravy;    // Current velocity due to gravity
   int hitpts;         // Current # of hitpoints the char has
   int lives;          // Current # of lives -1 = game over
-  unsigned long NextAni; // Next time to move the character
+  gm_ulong NextAni; // Next time to move the character
   unsigned char inv[MAXINV]; // Array of inventory items gathered
   int meter[MAXSEQ+10];      // Repetition counters
   char seqon[MAXSEQ];
@@ -395,7 +395,7 @@ static int     BresenhamScroll(BresScroll *b,int speed);
 
 static void    DoFunKy      (int keynum);
 static ulongi  LoadGame     (void);
-static void    SaveGame     (unsigned long SndTimeSaved);
+static void    SaveGame     (gm_ulong SndTimeSaved);
 static boolean Display_File (char *filen,Pixel col,uint PauseTime=32000);
 static void    GMabout      (void);
 static void    HelpFiles    (void);
@@ -480,8 +480,8 @@ static void FastTimer(void);
 
 static char HandleJStick(int fn); // 0=handle, RESETTIMER=reset internal clock
 
-extern int  CheckHighScores(char *gamename,long score);
-extern void ShowHighScores (char *gamename,long score=-1);
+extern int  CheckHighScores(char *gamename,gm_long score);
+extern void ShowHighScores (char *gamename,gm_long score=-1);
 
 
 static void StartSceneInits(Coord2d StartPosition);
@@ -669,6 +669,9 @@ QuitCodes main(int argc,char *argv[])
     TextMode();
     }
 
+#ifdef GM_PORT
+  if (joyinstall) jstickon=TRUE;       // the gamepad (or an idle stick) is always "installed"; a stick in the centre does nothing
+#endif
   if (cs.ForceSnd==SndBlaster) SongInfo=SoundCard(&cs);
   else SongInfo=0;
   if ((MicroChnl=MicroChannel())==TRUE) printf("MicroChannel Bus Detected!\n");
@@ -705,6 +708,10 @@ QuitCodes main(int argc,char *argv[])
   TextMode();
   return(quit);
 #else
+#ifdef GM_PORT
+  // "gmplay game.gam": play that game and leave, without the file picker (the launcher passes the name)
+  int DirectGame = (argc>1) && (strcmpi(FileExt(argv[1]),".gam")==0);
+#endif
   choice = 1;
   while (choice!=3)
     {
@@ -721,6 +728,9 @@ QuitCodes main(int argc,char *argv[])
 #ifdef FRAMEDUMP
         if (argc>2) strcpy(TempFname,argv[2]); else
 #endif
+#ifdef GM_PORT
+        if (DirectGame) strcpy(TempFname,argv[1]); else
+#endif
         if (!getfname(5,5,"Enter game to play: ","*.gam\0",TempFname)) return(menu);
         if (!ParseFileName(TempFname,gamename,WorkDir)) return(menu);
         *FileExt(gamename) = 0;
@@ -734,6 +744,9 @@ QuitCodes main(int argc,char *argv[])
       TextMode();
 #ifdef FRAMEDUMP
       if (argc>2) return(quit);        // Non-interactive oracle run: done.
+#endif
+#ifdef GM_PORT
+      if (DirectGame) return(quit);
 #endif
       choice++;
       }
@@ -1381,7 +1394,7 @@ static void DumpFrame(void)
   static ulongi Tick=0;
   static int Count=0;
   static RGBdata Pal[256];
-  long tick,timer,score;
+  gm_long tick,timer,score;
   int  scene,cx,cy,zpage;
   uint zadd;
 
@@ -1398,7 +1411,7 @@ static void DumpFrame(void)
     }
   if (tr)
     {
-    long monsum=0;
+    gm_long monsum=0;
     int  nmon=0;
     for (int m=0;m<LASTMM;m++)          // checksum of where every live monster is
       if (mm[m].monnum<LASTMON)
@@ -1409,7 +1422,7 @@ static void DumpFrame(void)
     fprintf(tr,"%lu timer=%lu rec=%lu idx=%d pend=%d seq=%d frame=%d x=%d y=%d scene=%d hp=%d lives=%d score=%ld mons=%d/%ld sub=%d,%d grav=%d,%d\n",
             (unsigned long)Tick,(unsigned long)TimerCounter,(unsigned long)Rec->RecordTimer,
             Rec->RecIndex,PendCtr,chr.cseq,chr.cframe,chr.x[0],chr.y[0],doscene,
-            ci.hitpts,ci.lives,(long)ci.score,nmon,monsum,chr.x[1],chr.y[1],ci.gravx,ci.gravy);
+            ci.hitpts,ci.lives,(long)ci.score,nmon,(long)monsum,chr.x[1],chr.y[1],ci.gravx,ci.gravy);
     if (getenv("FSCROLL"))      // extra indented line: scroll state (the compare script ignores lines that do not start with a digit)
       fprintf(tr,"  scroll m=%d,%d n=%d,%d mov=%d,%d tot=%d,%d ctr=%d,%d inmotion=%d next=%d,%d\n",
               mx,my,scroll.nx,scroll.ny,scroll.movx,scroll.movy,scroll.Totalx,scroll.Totaly,
@@ -1428,11 +1441,11 @@ static void DumpFrame(void)
   if (Count>=MaxFrames) { keydn[1]=1; return; }   // Quit the scene (ESC).
   Count++;
   GetAllPal(Pal);
-  tick=Tick; timer=TimerCounter; score=(long)ci.score;
+  tick=Tick; timer=TimerCounter; score=(gm_long)ci.score;
   scene=doscene; cx=chr.x[0]; cy=chr.y[0]; zadd=zeroaddon; zpage=zeropage;
   fwrite("FRM1",1,4,fp);
-  fwrite(&tick,sizeof(long),1,fp);   fwrite(&timer,sizeof(long),1,fp);
-  fwrite(&score,sizeof(long),1,fp);  fwrite(&scene,sizeof(int),1,fp);
+  fwrite(&tick,sizeof(gm_long),1,fp);   fwrite(&timer,sizeof(gm_long),1,fp);
+  fwrite(&score,sizeof(gm_long),1,fp);  fwrite(&scene,sizeof(int),1,fp);
   fwrite(&cx,sizeof(int),1,fp);      fwrite(&cy,sizeof(int),1,fp);
   fwrite(&zadd,sizeof(uint),1,fp);   fwrite(&zpage,sizeof(int),1,fp);
   fwrite(Pal,sizeof(RGBdata),256,fp);
@@ -2299,7 +2312,7 @@ static char DropBloc(void)
   register int k,j;
   char chosen;
   int x,y,keytyp;
-  unsigned long ClockPause;
+  gm_ulong ClockPause;
 
   ClockPause=clock;                   // Save so no time passes when fn key hit.
   setvect(0x9,OldKbd);                // Reset old keyboard handler address
@@ -3883,7 +3896,7 @@ static void OnGround(int Solid)
 
 static int MoveCharGrav(int fn)
   {
-  static unsigned long gclk=1;
+  static gm_ulong gclk=1;
   int retval=FALSE;
   int tempx=0;
   int tempy=0;
@@ -4129,7 +4142,7 @@ static void DrawScroll(int speed)
   union
     {
     unsigned char c[4];
-    unsigned long li;
+    gm_ulong li;
     unsigned int i[2];
     } wb;  
 
@@ -4526,9 +4539,12 @@ static char HandleJStick(int fn)
   char joypos=0;
   int joybut=0;
   static char oldbut=0;
-  static unsigned long oldtime=1;
+  static gm_ulong oldtime=1;
 
   if (fn==RESETTIMER) { oldtime=clock; return(FALSE); }
+#ifdef GM_PORT
+  if (Rec->RecFlag==PLAYBACK) return(FALSE);   // a replay must not be steered by whatever is plugged in
+#endif
 
   if ((jstickon)&&(joyinstall)&&(oldtime+JSTICKPOLLSPEED<=clock))
     {

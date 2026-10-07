@@ -18,5 +18,11 @@ typedef struct { float x, y, w, h; } FbRect;
 /* Draws any RGBA image (little-endian 0xAABBGGRR words), letterboxed; reports where it landed. */
 void fb_draw_rgba(const uint32_t *px, int w, int h, FbRect *out_rect);
 int  fb_save_png(const char *path);                    /* exact 320x200 frame, no window involved */
+void fb_set_fullscreen(int on);                        /* borderless full screen on/off */
+int  fb_is_fullscreen(void);
+void fb_toast(const char *fmt, ...);                   /* short message shown over the picture for 1.5 s */
+extern FbRect fb_last_rect;                            /* where the last picture landed in the window (mouse mapping) */
+/* Where a w x h picture goes in an aw x ah window for a GM_SCALE_* mode (the maths behind fb_draw_rgba). */
+FbRect fb_place(int w, int h, float aw, float ah, int mode);
 void fb_present(void);                                /* convert + draw + swap; call once per frame */
 #endif

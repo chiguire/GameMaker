@@ -7,10 +7,19 @@
 #ifndef GM_DOSPLAT_H
 #define GM_DOSPLAT_H
 #include <stdint.h>
+#include <stdio.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* File names. The engine uses DOS names ("SAMPLE\SAMPLE.GAM", any case). On Linux and macOS the shim routes fopen()
+ * and remove() through these (dospath.c): "\" becomes "/", a drive letter is dropped, and each name component is
+ * matched case-insensitively against what is on disk. On Windows the C runtime already does all of that. */
+FILE    *gm_fopen(const char *name, const char *mode);
+int      gm_remove(const char *name);
+/* Writes the host path for a DOS name to `out` (the name unchanged if nothing matches). Returns 1 if it exists. */
+int      gm_resolve_path(const char *dosname, char *out, size_t cap);
 
 /* Emulated real-mode address space. MK_FP(seg,off) == gm_dosmem + seg*16 + off.
  * VGA graphics memory lives at A000:0000 (gm_dosmem + 0xA0000). */
@@ -70,6 +79,10 @@ int16_t  gm_findnext(struct ffblk *f);
 void     gm_mouse_show(int16_t on);
 void     gm_mouse_get(int32_t *vx, int32_t *vy, int32_t *buttons);
 void     gm_mouse_set(int32_t vx, int32_t vy);
+
+/* Gamepad as the game-port joystick: x and y 0..200 (centre 100), buttons bit 0 and 1. Centred and idle when no
+ * gamepad is connected or gamepad use is switched off. */
+void     gm_joystick_read(int32_t *x, int32_t *y, int32_t *buttons);
 
 /* Borland C runtime rand()/srand(): a 32-bit LCG, reproduced so seeded runs match DOS exactly. */
 int16_t  gm_rand(void);

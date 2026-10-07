@@ -2,6 +2,7 @@
  * level, RMS, and the strongest frequency (FFT), so audio output can be checked without listening.
  *
  *   wavstat file.wav [window_seconds]
+ *   wavstat file.wav -s          one line: duration, peak and RMS (dBFS), number of clipped samples
  */
 #define _USE_MATH_DEFINES 1
 #include <math.h>
@@ -37,7 +38,7 @@ static void fft(double *re, double *im)
 
 int main(int argc, char **argv)
 {
-    if (argc < 2) { fprintf(stderr, "usage: wavstat file.wav [window_seconds]\n"); return 2; }
+    if (argc < 2) { fprintf(stderr, "usage: wavstat file.wav [window_seconds | -s]\n"); return 2; }
     FILE *f = fopen(argv[1], "rb");
     if (!f) { perror(argv[1]); return 1; }
     uint8_t hdr[44];
@@ -48,6 +49,15 @@ int main(int argc, char **argv)
     int16_t *s = malloc(n * 2);
     if (fread(s, 2, n, f) != (size_t)n) return 1;
     fclose(f);
+
+    if (argc > 2 && !strcmp(argv[2], "-s")) {            /* one line: duration, peak and RMS in dBFS, clipped samples */
+        double sum = 0; int peak = 0; long clipped = 0;
+        for (long i = 0; i < n; i++) { sum += (double)s[i] * s[i]; int a = abs(s[i]); if (a > peak) peak = a; if (a >= 32767) clipped++; }
+        double rms = n ? sqrt(sum / n) : 0;
+        printf("%s %.1f s peak %.1f dBFS rms %.1f dBFS clipped %ld\n", argv[1], (double)n / rate,
+               peak ? 20 * log10(peak / 32768.0) : -99.0, rms > 0 ? 20 * log10(rms / 32768.0) : -99.0, clipped);
+        return 0;
+    }
 
     double win = argc > 2 ? atof(argv[2]) : 1.0;
     long step = (long)(win * rate);

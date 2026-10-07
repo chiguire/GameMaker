@@ -12,6 +12,7 @@ param(
     [int]$Parallel = 3,
     [string]$Out = (Join-Path $env:TEMP ("gm_smoke_" + (Get-Date -Format 'HHmmss')))
 )
+$env:GM_NO_SETTINGS = '1'   # a person's saved window/volume settings must not change a test
 $root = Resolve-Path (Join-Path $PSScriptRoot '..')
 $exe = Join-Path $PSScriptRoot 'build\gmplay.exe'
 Add-Type -AssemblyName System.Drawing

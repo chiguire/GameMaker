@@ -6,6 +6,7 @@ param(
     [switch]$Replay,
     [int]$Seconds = 60
 )
+$env:GM_NO_SETTINGS = '1'   # a person's saved window/volume settings must not change a test
 $root = Resolve-Path (Join-Path $PSScriptRoot '..')
 $run = Join-Path $env:TEMP 'gm_port_run'
 if (Test-Path $run) { Remove-Item -Recurse -Force $run }

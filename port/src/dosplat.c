@@ -7,8 +7,16 @@
 #include "dosplat.h"
 #include "fb.h"
 #include "audio.h"
+#include "settings.h"
+#include "osclock.h"
 #include "font8x8.h"
 #include <raylib.h>
+
+/* GM_HEADLESS=1 (test hook): no window, no keyboard/mouse/gamepad, no audio device. Replays and scripted-input runs
+ * (GM_TYPE, GM_SHOT, FDUMP, GM_WAV) work as usual; used by CI machines and by tests on systems without a display. */
+static int headless;
+#define IsKeyDown(k) (!headless && (IsKeyDown)(k))
+#define IsMouseButtonDown(b) (!headless && (IsMouseButtonDown)(b))
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -117,7 +125,7 @@ static void default_palette(void)
 }
 
 static int mouse_shown;
-static FbRect game_rect = { 0, 0, 960, 600 };      /* where the VGA image landed in the window */
+static FbRect game_rect = { 0, 0, 960, 720 };      /* where the VGA image landed in the window */
 
 /* ---------------------------------------------------------------------------------------------
  * Window / presentation
@@ -128,10 +136,16 @@ static double last_present;
 static void ensure_window(void)
 {
     if (window_open) return;
-    SetTraceLogLevel(LOG_WARNING);
-    fb_open("GameMaker", 3);
+    headless = getenv("GM_HEADLESS") != NULL;
+    if (headless) { gm_audio_set_headless(1); SetTraceLogLevel(LOG_WARNING); }
+    else {
+        SetTraceLogLevel(LOG_WARNING);
+        fb_open("GameMaker", 3);
+    }
     window_open = 1;
-    last_present = GetTime();
+    gm_audio_set_volume(gm_settings.volume);
+    gm_audio_set_mute(gm_settings.mute);
+    last_present = gm_os_time();
 }
 
 #define RGBA(r6, g6, b6) ((uint32_t)(((r6) << 2) | ((r6) >> 4)) | ((uint32_t)(((g6) << 2) | ((g6) >> 4)) << 8) | \
@@ -174,16 +188,12 @@ static void present(void)
                     if (x < FB_W && y < FB_H) fb_pix[y * FB_W + x] = (c == 0 || c == r || r == 9) ? 0 : 15;
                 }
         }
-        fb_present();
-        /* fb_present drew 320x200; remember the letterbox for mouse mapping */
-        float sw = (float)GetRenderWidth(), sh = (float)GetRenderHeight();
-        float s = sw / FB_W < sh / FB_H ? sw / FB_W : sh / FB_H;
-        game_rect = (FbRect){ (sw - FB_W * s) / 2, (sh - FB_H * s) / 2, FB_W * s, FB_H * s };
+        if (!headless) { fb_present(); game_rect = fb_last_rect; }       /* the rectangle is for mouse mapping */
     } else {
         render_text(mouse_shown ? (int)(mx / 8) : -1, mouse_shown ? (int)(my / 8) : -1);
-        fb_draw_rgba(text_rgba, 640, 400, &game_rect);
+        if (!headless) fb_draw_rgba(text_rgba, 640, 400, &game_rect);
     }
-    last_present = GetTime();
+    last_present = gm_os_time();
 
     /* Test hook: GM_SHOT=<file.png> saves the exact emulated screen after GM_SHOT_AFTER seconds (default 3) and exits. */
     static const char *shot;
@@ -197,7 +207,7 @@ static void present(void)
     if (shot && strchr(shot, '%')) {
         double every = getenv("GM_SHOT_EVERY") ? atof(getenv("GM_SHOT_EVERY")) : 4.0;
         if (next_seq < 0) next_seq = every;
-        if (GetTime() >= next_seq) {
+        if (gm_os_time() >= next_seq) {
             static int seq;
             char name[512];
             snprintf(name, sizeof name, shot, seq++);
@@ -205,11 +215,11 @@ static void present(void)
             else { Image img = { text_rgba, 640, 400, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 }; ExportImage(img, name); }
             next_seq += every;
         }
-        if (GetTime() >= shot_after) { fb_close(); exit(0); }
-    } else if (shot && GetTime() >= shot_after) {
+        if (gm_os_time() >= shot_after) { if (!headless) fb_close(); exit(0); }
+    } else if (shot && gm_os_time() >= shot_after) {
         if (video_mode == 0x13) fb_save_png(shot);
         else { Image img = { text_rgba, 640, 400, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 }; ExportImage(img, shot); }
-        fb_close();
+        if (!headless) fb_close();
         exit(0);
     }
 }
@@ -294,10 +304,157 @@ static void key_event(int idx, int down)
     }
 }
 
+/* ---------------------------------------------------------------------------------------------
+ * Host controls: F11 / Alt+Enter full screen, F12 picture scaling, Alt+Up / Alt+Down volume, Alt+M mute.
+ * While Alt is held the chord keys are hidden from the game. (F11/F12 are not game keys: the engine knows F1-F10.)
+ * Edges are detected here rather than with raylib's IsKeyPressed(), which stays true for every call within a frame.
+ * ------------------------------------------------------------------------------------------- */
+static int host_alt;
+
+static int edge(int *prev, int now) { int e = now && !*prev; *prev = now; return e; }
+
+static void act_fullscreen(void)
+{
+    fb_set_fullscreen(!fb_is_fullscreen());
+    gm_settings.fullscreen = fb_is_fullscreen();
+    fb_toast(gm_settings.fullscreen ? "Full screen" : "Window");
+}
+
+static void act_scale(void)
+{
+    static const char *names[GM_SCALE_COUNT] = { "Whole-number scale, 4:3", "Fit window, 4:3", "Whole-number scale, square pixels", "Fit window, square pixels" };
+    gm_settings.scale_mode = (gm_settings.scale_mode + 1) % GM_SCALE_COUNT;
+    fb_toast("%s", names[gm_settings.scale_mode]);
+}
+
+static void act_volume(int delta)
+{
+    gm_settings.volume += delta;
+    if (gm_settings.volume > 100) gm_settings.volume = 100;
+    if (gm_settings.volume < 0) gm_settings.volume = 0;
+    gm_settings.mute = 0;
+    gm_audio_set_volume(gm_settings.volume);
+    gm_audio_set_mute(0);
+    fb_toast("Volume %d%%", gm_settings.volume);
+}
+
+static void act_mute(void)
+{
+    gm_settings.mute = !gm_settings.mute;
+    gm_audio_set_mute(gm_settings.mute);
+    if (gm_settings.mute) fb_toast("Sound off"); else fb_toast("Sound on (volume %d%%)", gm_settings.volume);
+}
+
+/* Test hook: GM_HOST_KEYS="f11@3,volup@4,mute@5" runs those host actions (f11, f12, volup, voldn, mute) at the
+ * given seconds, because the real key chords cannot be scripted. */
+static int host_test_actions(void)
+{
+    static const char *spec;
+    static int init;
+    static double done_at[32];
+    if (!init) { init = 1; spec = getenv("GM_HOST_KEYS"); }
+    if (!spec) return 0;
+    int changed = 0, i = 0;
+    for (const char *p = spec; *p; i++) {
+        char name[16] = { 0 };
+        double at = 0;
+        int n = 0;
+        if (sscanf(p, "%15[a-z0-9]@%lf%n", name, &at, &n) < 2) break;
+        p += n;
+        if (*p == ',') p++;
+        if (i >= 32 || done_at[i] || gm_os_time() < at) continue;
+        done_at[i] = 1;
+        if (!strcmp(name, "f11")) act_fullscreen();
+        else if (!strcmp(name, "f12")) act_scale();
+        else if (!strcmp(name, "volup")) act_volume(10);
+        else if (!strcmp(name, "voldn")) act_volume(-10);
+        else if (!strcmp(name, "mute")) act_mute();
+        changed = 1;
+    }
+    return changed;
+}
+
+static void host_controls(void)
+{
+    static int p_f11, p_f12, p_enter, p_up, p_down, p_m;
+    host_alt = (IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT)) && !IsKeyDown(KEY_LEFT_CONTROL) && !IsKeyDown(KEY_RIGHT_CONTROL);
+    int changed = host_test_actions();
+
+    if (edge(&p_f11, IsKeyDown(KEY_F11)) | edge(&p_enter, host_alt && IsKeyDown(KEY_ENTER))) { act_fullscreen(); changed = 1; }
+    if (edge(&p_f12, IsKeyDown(KEY_F12))) { act_scale(); changed = 1; }
+    int up = edge(&p_up, host_alt && IsKeyDown(KEY_UP)), down = edge(&p_down, host_alt && IsKeyDown(KEY_DOWN));
+    if (up || down) { act_volume(up ? 10 : -10); changed = 1; }
+    if (edge(&p_m, host_alt && IsKeyDown(KEY_M))) { act_mute(); changed = 1; }
+    if (changed) gm_settings_save();
+}
+
+static int chord_key(int rkey) { return rkey == KEY_ENTER || rkey == KEY_UP || rkey == KEY_DOWN || rkey == KEY_M; }
+
+/* ---------------------------------------------------------------------------------------------
+ * Gamepad. In a game it is a joystick (ReadJoyStick, see input_asm.cpp); in the menus, which read the BIOS keyboard,
+ * the D-pad or left stick press the arrow keys, A is Enter and B is Esc. Start is Esc everywhere.
+ * ------------------------------------------------------------------------------------------- */
+static int pad_present(void) { return !headless && gm_settings.gamepad && IsGamepadAvailable(0); }
+
+static float pad_axis(int axis)
+{
+    float v = GetGamepadAxisMovement(0, axis);
+    return (v > -0.35f && v < 0.35f) ? 0.0f : v;
+}
+
+typedef struct { int up, down, left, right, a, b, start; } PadState;
+
+static PadState pad_state(void)
+{
+    PadState s = { 0 };
+    if (!pad_present()) return s;
+    float ax = pad_axis(GAMEPAD_AXIS_LEFT_X), ay = pad_axis(GAMEPAD_AXIS_LEFT_Y);
+    s.up = IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_UP) || ay < 0;
+    s.down = IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_DOWN) || ay > 0;
+    s.left = IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_LEFT) || ax < 0;
+    s.right = IsGamepadButtonDown(0, GAMEPAD_BUTTON_LEFT_FACE_RIGHT) || ax > 0;
+    s.a = IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN) || IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_LEFT);
+    s.b = IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT) || IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_UP);
+    s.start = IsGamepadButtonDown(0, GAMEPAD_BUTTON_MIDDLE_RIGHT);
+    return s;
+}
+
+/* The joystick the engine reads: positions 0..200 with the centre at 100 (the game's own calibration screen and
+ * the port's defaults agree on that range), and two buttons. */
+void gm_joystick_read(int32_t *x, int32_t *y, int32_t *buttons)
+{
+    *x = *y = 100;
+    *buttons = 0;
+    if (!pad_present()) return;
+    PadState s = pad_state();
+    if (s.left) *x = 0; else if (s.right) *x = 200;
+    if (s.up) *y = 0; else if (s.down) *y = 200;
+    *buttons = (IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_DOWN) || IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_LEFT) ? 1 : 0) |
+               (IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT) || IsGamepadButtonDown(0, GAMEPAD_BUTTON_RIGHT_FACE_UP) ? 2 : 0);
+}
+
+static int pad_wants_key(int rkey, const PadState *p)
+{
+    if (rkey == KEY_ESCAPE) return p->start || (vectors[9] == NULL && p->b);
+    if (vectors[9] != NULL) return 0;                         /* in a game the pad is a joystick, not arrow keys */
+    switch (rkey) {
+    case KEY_UP: return p->up;
+    case KEY_DOWN: return p->down;
+    case KEY_LEFT: return p->left;
+    case KEY_RIGHT: return p->right;
+    case KEY_ENTER: return p->a;
+    default: return 0;
+    }
+}
+
 static void poll_keys(void)
 {
+    if (!headless) host_controls();
+    PadState pad = pad_state();
     for (int i = 0; i < NKEYS; i++) {
-        int d = IsKeyDown(keymap[i].rkey) || synth_down[i];
+        int rk = keymap[i].rkey;
+        int real = IsKeyDown(rk) && !(host_alt && chord_key(rk));
+        int d = real || synth_down[i] || pad_wants_key(rk, &pad);
         if (d != key_down[i]) { key_down[i] = (uint8_t)d; key_event(i, d); }
     }
 }
@@ -344,11 +501,11 @@ static void type_keys(void)
     if (pos < 0) {
         buf = getenv("GM_TYPE");
         pos = 0;
-        next = GetTime() + (getenv("GM_TYPE_AT") ? atof(getenv("GM_TYPE_AT")) : 2.0);
+        next = gm_os_time() + (getenv("GM_TYPE_AT") ? atof(getenv("GM_TYPE_AT")) : 2.0);
         if (!buf) return;
     }
-    if (!buf || GetTime() < next) return;
-    next = GetTime() + 0.08;
+    if (!buf || gm_os_time() < next) return;
+    next = gm_os_time() + 0.08;
     if (held >= 0) {                                   /* release the key typed on the previous step */
         if (hold_left-- > 0) return;
         synth_down[held] = 0; synth_shift = 0; held = -1; return;
@@ -358,7 +515,7 @@ static void type_keys(void)
     int hold = 0, shift = 0, idx = -1;
     char c = buf[pos++];
     if (c == '\\' && buf[pos] == 'w') {                /* \wNN: pause NN * 80 ms */
-        next = GetTime() + ((buf[pos + 1] - '0') * 10 + (buf[pos + 2] - '0')) * 0.08;
+        next = gm_os_time() + ((buf[pos + 1] - '0') * 10 + (buf[pos + 2] - '0')) * 0.08;
         pos += 3;
         return;
     }
@@ -385,7 +542,7 @@ static void unmask_kbd(void)
 
 static void fire_timer(void)
 {
-    double now = GetTime();
+    double now = gm_os_time();
     double period = (pit_divisor ? pit_divisor : 0x10000) / 1193182.0;
     if (next_tick == 0) next_tick = now + period;
     int budget = 8;                                  /* don't spiral after a stall */
@@ -401,8 +558,8 @@ void gm_pump(void)
     gm_heartbeat++;
     if (in_isr) return;
     ensure_window();
-    if (WindowShouldClose()) { fb_close(); exit(0); }
-    if (GetTime() - last_present >= 1.0 / 60.0) present();
+    if (!headless && WindowShouldClose()) { fb_close(); exit(0); }
+    if (gm_os_time() - last_present >= 1.0 / 60.0) present();
     poll_keys();
     type_keys();
     gm_audio_pump();
@@ -416,7 +573,7 @@ void gm_mouse_show(int16_t on) { mouse_shown = on; }
 
 void gm_mouse_get(int32_t *vx, int32_t *vy, int32_t *buttons)
 {
-    if (!window_open) { *vx = *vy = *buttons = 0; return; }
+    if (!window_open || headless) { *vx = *vy = *buttons = 0; return; }
     Vector2 p = GetMousePosition();
     float s = (float)GetRenderWidth() / (float)GetScreenWidth();   /* DPI scale: render px per logical px */
     float nx = (p.x * s - game_rect.x) / game_rect.w, ny = (p.y * s - game_rect.y) / game_rect.h;
@@ -430,7 +587,7 @@ void gm_mouse_get(int32_t *vx, int32_t *vy, int32_t *buttons)
 
 void gm_mouse_set(int32_t vx, int32_t vy)
 {
-    if (!window_open) return;
+    if (!window_open || headless) return;
     float s = (float)GetRenderWidth() / (float)GetScreenWidth();
     SetMousePosition((int)((game_rect.x + vx / 639.0f * game_rect.w) / s), (int)((game_rect.y + vy / 199.0f * game_rect.h) / s));
 }
@@ -445,7 +602,8 @@ uint8_t gm_inportb(uint16_t port)
         static uint32_t n;
         gm_pump();
         n++;
-        double ph = fmod(GetTime() * 70.0, 1.0);
+        double ph = headless ? (double)(n & 15) / 16.0              /* test mode: retrace comes round every 16 reads, no waiting */
+                             : fmod(gm_os_time() * 70.0, 1.0);
         return (uint8_t)((ph > 0.93 ? 8 : 0) | (n & 1));
     }
     case 0x3C9:
@@ -498,7 +656,7 @@ uint16_t gm_bioskey(int16_t cmd)
     gm_pump();
     if (cmd == 2) return (uint16_t)(shift_held() ? 3 : 0);
     if (cmd == 1) return bios_n ? bios_buf[0] : 0;
-    while (!bios_n) { gm_pump(); WaitTime(0.001); }          /* cmd 0: block */
+    while (!bios_n) { gm_pump(); gm_os_sleep_ms(1); }          /* cmd 0: block */
     uint16_t k = bios_buf[0];
     memmove(bios_buf, bios_buf + 1, (--bios_n) * sizeof bios_buf[0]);
     return k;
@@ -539,8 +697,8 @@ int16_t gm_int86(int16_t intno, union REGS *in, union REGS *out)
 void gm_delay(uint32_t ms)
 {
     ensure_window();
-    double end = GetTime() + ms / 1000.0;
-    do { gm_pump(); WaitTime(0.001); } while (GetTime() < end);
+    double end = gm_os_time() + ms / 1000.0;
+    do { gm_pump(); gm_os_sleep_ms(1); } while (gm_os_time() < end);
 }
 
 void gm_sound(uint16_t hz) { gm_speaker(hz); }       /* PC speaker */

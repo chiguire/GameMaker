@@ -45,6 +45,15 @@ at tick 849 and led to the 16-bit overflow fix described in ../README.md.
 lives, score, a checksum of every monster, sub-block position, gravity) matches line for line.
 "Pixels" are the 64,000 bytes of video memory every 20 ticks, compared exactly.
 
+### Other platforms
+
+The same replays were run on Linux (Debian, GCC 14, under WSL) with `GM_HEADLESS=1` (no window or audio device) and
+compared with the DOS runs made on Windows using `compare.sh`: **all 8 shipped demos and all 8 generated recordings have
+identical ticks and identical video memory in every compared frame** (nebula up to 1,500 frames, as above).
+`check_states.sh` reproduces the DOS frame tables kept in the repository for the 12 recordings that have one. Windows
+was re-run after the portability changes with the same result (16 of 16). The DOS build was also rebuilt from the
+modified sources with Borland C++ and still produces the same table (houses).
+
 ## How a run works
 
 `playgame <game>\demo.rec <game>\<game>.gam` (instrumented build only) plays the recording and appends
@@ -88,6 +97,8 @@ DOS is not deterministic on its own (wall-clock time, uninitialised memory), so 
 | `run_baseline.ps1` | replays demos in DOSBox and writes the files above; full dumps and traces stay in `%TEMP%\gm_oracle` |
 | `compare.ps1` | replays the same demos in `gmplay` and compares ticks, game state and pixels against the DOS run |
 | `../tools/fdump.c` | `fdump list|png|diff` for the frame dumps |
+| `compare.sh` | `compare.ps1` for Linux and macOS: replays in `gmplay` and compares with a DOS run made on Windows (copy `%TEMP%\gm_oracle`): `compare.sh <oracle dir> bcuda houses ...` |
+| `check_states.sh` | a check that needs no DOS run: replays recordings and compares the frame table with the DOS one kept in the repository (`<game>/states.txt`, `<game>-gen/states.txt`). Game logic and scrolling, not pixels. Works on any platform, headless: `check_states.sh bcuda houses donut-gen ...` |
 | `gen_recordings.ps1` | plays games with seeded random keys so the engine saves a recording (`recs/<game>.rec`, kept in the repo); `run_baseline.ps1`/`compare.ps1` replay them with `-Recs <dir> -Tag -gen`. A recording is saved only if the session ends cleanly through the high-score screens, which depends on timing: re-run with another `-Seed` for games that failed |
 | `<game>-gen/` | the same artifacts for generated recordings |
 | `../smoke.ps1`, `../datacheck.ps1` | not DOS comparisons: start every playable game with scripted input and report crashes/frozen screens; validate the game data files |

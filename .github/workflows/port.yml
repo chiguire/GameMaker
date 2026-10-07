@@ -1,0 +1,52 @@
+# Builds the raylib port on Windows, Linux and macOS and runs the checks that need no display or audio device.
+# On Linux it also replays the demo recordings under a virtual display and compares the result with the DOS runs
+# checked into port/baseline (the frame tables in <game>/states.txt).
+name: port
+
+on:
+  push:
+    paths: ['port/**', 'code/**', '.github/workflows/port.yml']
+  pull_request:
+    paths: ['port/**', 'code/**', '.github/workflows/port.yml']
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Linux packages (raylib window and GL headers, virtual display)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libasound2-dev
+
+      - name: Configure
+        run: cmake -S port -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Platform self-test (settings, scaling, DOS-style file names)
+        shell: bash
+        run: |
+          mkdir -p scratch && cd scratch
+          exe=$(find ../build -name platformtest -o -name platformtest.exe | head -1)
+          "$exe"
+
+      - name: Audio self-test (FM chip, speaker, samples; no device needed)
+        shell: bash
+        run: |
+          exe=$(find build -name audiotest -o -name audiotest.exe | head -1)
+          "$exe"
+
+      - name: Replay demos and compare with the DOS frame tables (Linux; headless, no display needed)
+        if: runner.os == 'Linux'
+        run: |
+          export GM_BUILD_DIR=$PWD/build
+          sh port/baseline/check_states.sh bcuda houses volume zark donut-gen glub-gen

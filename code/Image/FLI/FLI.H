@@ -10,7 +10,7 @@ enum ChunkTypes GM_ENUM16
 class FLIHeader
   {
   public:
-  long FileSize;
+  gm_long FileSize;
   uint     FileID;
   uint     NumFrames;
   uint     Width;
@@ -18,8 +18,8 @@ class FLIHeader
   uint     PixDepth;
   int      Flags;   // = 0
   uint     FrameSpd;
-  long Next;    // = 0
-  long Frit;   // = 0
+  gm_long Next;    // = 0
+  gm_long Frit;   // = 0
   uchar    Xtra[102];
   boolean  Validate(void)
     {
@@ -29,7 +29,7 @@ class FLIHeader
   void Print(void)
     {
     char s[81];
-    sprintf(s,"Size:%lu Frames:%d Dim:(%d,%d) ColorDepth:%d Spd:%d\n",FileSize,NumFrames,Width,Height,PixDepth,FrameSpd);
+    sprintf(s,"Size:%lu Frames:%d Dim:(%d,%d) ColorDepth:%d Spd:%d\n",(unsigned long)FileSize,NumFrames,Width,Height,PixDepth,FrameSpd);
     DEBUG(s);
     }
   };
@@ -38,7 +38,7 @@ class FLIHeader
 class FrameHeader
   {
   public:
-  long Size;  // In bytes.
+  gm_long Size;  // In bytes.
   uint     ID;
   uint     NumChunks;
   char     Xtra[8];

@@ -18,6 +18,7 @@ param(
     [string]$Out = (Join-Path $PSScriptRoot 'recs'),
     [string]$Work = (Join-Path $env:TEMP ("gm_gen_" + (Get-Date -Format 'HHmmss')))
 )
+$env:GM_NO_SETTINGS = '1'   # a person's saved window/volume settings must not change a test
 $root = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 $exe = Join-Path $root 'port\build\gmplay.exe'
 New-Item -ItemType Directory -Force $Out | Out-Null

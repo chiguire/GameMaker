@@ -33,7 +33,7 @@ for faster DMA.
 
 typedef struct
   {
-  long   Size;
+  gm_long   Size;
   ChunkTypes Type;
   } ChunkHeader;
 

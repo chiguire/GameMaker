@@ -287,7 +287,10 @@ int  getfname(int x,int y,const char *q,const char *fspec,char *ans)
             }                               // No break statement so will act
           else inkey='\\';                  // as if backslash was just typed
         default:
-          if (numq<maxa) 
+#ifdef GM_PORT
+          if ((inkey&255)=='/') inkey='\\';   // other platforms write paths with "/"; the engine's names use "\"
+#endif
+          if (numq<maxa)
             {
             ans[numq]=(inkey&255);
             writech(x+lenq+numq,y,attrq+15,ans[numq]);
