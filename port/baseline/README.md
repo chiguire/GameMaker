@@ -7,25 +7,43 @@ sides write identical records and `compare.ps1` diffs them.
 
 ## Result
 
-All eight sample games that ship a demo recording replay **identically** in DOS and in the port
-(8 recordings, 17,000+ game ticks; run `compare.ps1` to reproduce):
+Everything compared is **identical** between DOS and the port: tick traces, game state and all video memory dumps.
+
+Shipped demo recordings (`compare.ps1 -Games ...`), each replayed to the end of its recording:
 
 | game | ticks (DOS vs port) | frames with differing game state | frames with differing pixels |
 |---|---|---|---|
 | bcuda | identical (1625) | 0 of 81 | 0 of 81 |
 | houses | identical (1049) | 0 of 52 | 0 of 52 |
-| nebula | identical (3021) | 0 of 150 | 0 of 150 |
-| peach | identical (3021) | 0 of 150 | 0 of 150 |
-| pipemare | identical (3021) | 0 of 150 | 0 of 150 |
-| tutor | identical (3021) | 0 of 150 | 0 of 150 |
+| nebula | identical (30021) | 0 of 1500 | 0 of 1500 |
+| peach | identical (51848) | 0 of 2592 | 0 of 2592 |
+| pipemare | identical (3562) | 0 of 178 | 0 of 178 |
+| tutor | identical (4753) | 0 of 237 | 0 of 237 |
 | volume | identical (1858) | 0 of 92 | 0 of 92 |
 | zark | identical (1546) | 0 of 77 | 0 of 77 |
+
+(nebula's recording is much longer than the others; it is compared up to a 1,500-frame cap, `-MaxFrames 1500`.)
+
+Generated recordings: games without a demo were played with seeded random keys (`gen_recordings.ps1`), which makes the
+engine save its own recording; those were then replayed in both (`-Recs recs -Tag -gen`):
+
+| game | ticks | frames differing (state / pixels) |
+|---|---|---|
+| donut | identical (928) | 0 of 46 / 0 of 46 |
+| glub | identical (1281) | 0 of 64 / 0 of 64 |
+| heart | identical (1206) | 0 of 60 / 0 of 60 |
+| outerlim | identical (1281) | 0 of 64 / 0 of 64 |
+| penguin | identical (1455) | 0 of 72 / 0 of 72 |
+| rings5 | identical (1465) | 0 of 73 / 0 of 73 |
+| sample | identical (1465) | 0 of 73 / 0 of 73 |
+| terrain | identical (1165) | 0 of 58 / 0 of 58 |
+
+warrior produced no recording (its session never reached the high-score screens in three tries). rings5 first differed
+at tick 849 and led to the 16-bit overflow fix described in ../README.md.
 
 "Ticks identical" means a per-tick trace (sequence, animation frame, position, scene, hit points,
 lives, score, a checksum of every monster, sub-block position, gravity) matches line for line.
 "Pixels" are the 64,000 bytes of video memory every 20 ticks, compared exactly.
-
-nebula, peach, pipemare and tutor stop at the 150-frame cap (3,000 ticks), not at the end of their recording.
 
 ## How a run works
 
@@ -70,6 +88,9 @@ DOS is not deterministic on its own (wall-clock time, uninitialised memory), so 
 | `run_baseline.ps1` | replays demos in DOSBox and writes the files above; full dumps and traces stay in `%TEMP%\gm_oracle` |
 | `compare.ps1` | replays the same demos in `gmplay` and compares ticks, game state and pixels against the DOS run |
 | `../tools/fdump.c` | `fdump list|png|diff` for the frame dumps |
+| `gen_recordings.ps1` | plays games with seeded random keys so the engine saves a recording (`recs/<game>.rec`, kept in the repo); `run_baseline.ps1`/`compare.ps1` replay them with `-Recs <dir> -Tag -gen`. A recording is saved only if the session ends cleanly through the high-score screens, which depends on timing: re-run with another `-Seed` for games that failed |
+| `<game>-gen/` | the same artifacts for generated recordings |
+| `../smoke.ps1`, `../datacheck.ps1` | not DOS comparisons: start every playable game with scripted input and report crashes/frozen screens; validate the game data files |
 
 Reproduce: `port\build.bat`, `baseline\build_oracle.ps1`, `baseline\run_baseline.ps1 -Games bcuda,nebula,...`,
 `baseline\compare.ps1 -Games bcuda,nebula,...` (four games at a time is fine; running all eight windows at once

@@ -21,13 +21,17 @@ cd runtime\run\GM && ..\..\..\port\build\gmplay.exe     # interactive; needs GM.
 `gmplay` takes the same arguments as `playgame`. Windows is the only platform tried so far; the platform layer is
 plain C over raylib except `dosfind.c` (directory listing, Win32) and the crash/hang diagnostics in `gmplay_main.cpp`.
 
+Whole-project checks: `port\smoke.ps1` starts every playable game with scripted input and reports crashes, hangs and
+frozen screens; `port\datacheck.ps1` looks for damaged game data; `port\baseline\compare.ps1` checks the port against DOS.
+Licenses of what the port builds on: [THIRD_PARTY.md](THIRD_PARTY.md).
+
 ## How it works
 
 | Piece | Where | What it does |
 |---|---|---|
 | Borland shim | `shim/gmcompat.h` | Force-included before every engine file: 16-bit `int` and enums, byte-packed structs, `far`/`near`/`interrupt` keywords removed, `MK_FP`/`FP_SEG` into an emulated 1 MB address space, `inportb`/`outportb`/`setvect`/`bioskey` routed to the platform layer, Borland's own `rand()`/`random()` |
 | Platform layer | `src/dosplat.c`, `dosfind.c` | Emulated memory (VGA at `A000:0`, text at `B800:0`), far heap, VGA DAC palette, PIT timer and keyboard "interrupts" delivered cooperatively from `gm_pump()`, BIOS keyboard/video/mouse, `findfirst` |
-| Video | `src/fb.c`, `font8x8.h` | Indexed 320x200 and 80x25 text screens converted to RGBA and letterboxed in a raylib window. The 8x8 font was extracted from a Windows `.FON` with `tools/fon2h.c` |
+| Video | `src/fb.c`, `font8x8.h` | Indexed 320x200 and 80x25 text screens converted to RGBA and letterboxed in a raylib window. The 8x8 font is [Unscii](https://github.com/viznut/unscii) (public domain), generated into `font8x8.h` by `tools/mkfont.ps1` |
 | Assembly rewrites | `src/gfx_asm.cpp`, `text_asm.cpp`, `input_asm.cpp`, `vgaobj.cpp` | C++ versions of `SVGAA`, `BLOCA`, `MEMBLOCA`, `PALA`, `SCRNROUT`, `MICROCNL`, `JSTICKA`, `OLDMOUSE` and the VGA driver object |
 | Hardware stand-ins | `src/svga_port.cpp` | A single "software scrolled" VGA card |
 | Sound | `src/audio.cpp`, `sound_port.cpp` | Mixer (OPL2 synthesizer, PC speaker, one VOC voice) feeding a raylib audio stream, and the engine-side FM driver; see "Sound" below |
@@ -122,16 +126,30 @@ Things learned the hard way, so they do not have to be rediscovered.
   never-initialised sentinel block read leftover heap; `strncmpi(argv[1], ...)` read `argv[1]` when it was NULL.
   Anything like this changes behaviour with memory layout, so do not try to copy the garbage (a first attempt that copied
   the bytes broke as soon as the DOS executable's layout changed). Define the behaviour instead.
+- **16-bit arithmetic overflow.** `#define int short` makes variables 16-bit, but C still does the arithmetic in 32 bits, so
+  `a*b` no longer wraps. `ChangeScroll` multiplies a screen distance by 40; when the character is far off screen (it is
+  for a while after some scene changes) the product exceeded 32,767 and DOS scrolled at a wrapped, different speed. Found
+  by a generated recording of rings5 (tick 849); fixed with `(int)(a*b)` casts at the four places. Expect more of these:
+  any product or sum of `int`s that can exceed 16 bits needs the same cast.
+- **Array indices that DOS got away with.** `blkmap`/`nextbl` are bytes (up to 255) but `blks[0]` has 150 entries, and
+  peach and zark have junk `nextbl` values (255, 249) in unused blocks. DOS read whatever followed the array; a 64-bit
+  heap faults. The port allocates 256 entries (`GM_PORT` only, because 256 blocks do not fit one far allocation).
 - **Wall-clock time leaks into game logic.** Monsters compare absolute clock values, and DOS loading time advanced the
   clock between scenes. Replays are only repeatable with the deterministic clock described in baseline/README.md.
 
 ### Damaged game data
 
-- Some game files in this repository are cut short. `cd/gameware/bcuda/cfadein.fli` and `cfadeout.fli` are 16,384 bytes but
-  their headers say 104,206, so most of each fade is missing. Only 18 files in `cd/` and `runtime/` are exactly 16,384
-  bytes (the others are maps, block files and `bwon.gif`; I did not check whether those are complete). The engine reads
-  such files without validating them; in DOS the same code would have used whatever stale bytes were in its buffers, which I
-  did not try. When a game misbehaves on one screen, check that screen's file sizes against their headers first.
+- `datacheck.ps1` validates the data files (GIF and VOC structure, FLI and CMF lengths, and the sizes of the fixed-size
+  map/block/character/monster/palette files). Of 3,248 files, **18 are cut off at exactly 16,384 bytes, all of them in
+  BCUDA**: 12 `.map`, 3 `.bbl`, `bwon.gif`, and `cfadein.fli`/`cfadeout.fli` (whose headers say 104,206 and 132,330 bytes).
+  BCUDA therefore plays with missing map rows and blocks and shortened fades, in DOS as well as here (its demo replays
+  identically in both). Everything else it flags is harmless: two leftover `pipes*.gif` files that no game references, `.cbl`
+  files with 2 extra bytes, and a stray byte after one VOC.
+- The engine reads these files without validating them. When a game misbehaves on one screen, run `datacheck.ps1` and
+  compare that screen's file sizes against their headers first.
+- Only the 17 games in `cd/gameware` use the 3.0 file format that `gmplay` loads. The 14 games in `cd/sharware` are in an
+  older format and each ships with its own old engine executable; the 3.0 player (DOS and port alike) rejects them with
+  "Incorrect Data File Version". They still run in DOSBox with their own executables.
 
 ### Diagnosing crashes and hangs
 
@@ -150,11 +168,19 @@ Things learned the hard way, so they do not have to be rediscovered.
 3. If more detail is needed, temporarily add `fprintf` lines to the `FRAMEDUMP` code in `PLAYGAME.C`: a full monster
    dump at one tick, one monster slot every tick, or the intermediate values inside `movechars()`; run both builds with
    the same environment variables and diff. This is how the `map` row, the sentinel block and the clock problems were
-   found. Remove the extra output afterwards; only the per-tick trace is kept.
+   found. Remove the extra output afterwards; only the per-tick trace is kept. One extra line is kept behind an
+   environment variable: `FSCROLL=1` (set it for both `run_baseline.ps1` and `compare.ps1`) adds an indented line with the
+   scroll state after each tick, which is what located the 16-bit overflow in `ChangeScroll`.
 4. Before blaming the port, run the DOS side twice (ideally once under load): if DOS differs from itself, the cause is
    non-determinism in the original, not the port.
 
 ## Next
+
+More differential tests: `baseline/gen_recordings.ps1` plays a game with seeded random keys and saves the engine's own
+recording, which DOS and the port then replay (`run_baseline.ps1`/`compare.ps1` with `-Recs baseline\recs -Tag -gen`).
+It found the scroll overflow above on its first useful game. A game's recording is only saved if the session ends cleanly
+through the high-score screens, which depends on wall-clock timing, so the script is run again (new `-Seed`) for games
+that did not produce one.
 
 Joystick/gamepad, volume and mute controls, a cleaner window/fullscreen experience, other platforms, and then the
 editors.

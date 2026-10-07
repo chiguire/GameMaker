@@ -11,7 +11,10 @@
 param(
     [Parameter(Mandatory)][string[]]$Games,
     [string]$Work = (Join-Path $env:TEMP 'gm_oracle'),
-    [int]$Seconds = 400
+    [int]$Seconds = 400,
+    [int]$MaxFrames = 5000,          # must equal the cap used by run_baseline.ps1
+    [string]$Recs,                   # replay <Recs>\<game>.rec instead of the shipped demo (same value as for run_baseline.ps1)
+    [string]$Tag = ''                # same value as for run_baseline.ps1
 )
 $ErrorActionPreference = 'Stop'
 $root = Resolve-Path (Join-Path $PSScriptRoot '..\..')
@@ -21,15 +24,17 @@ $fdump = Join-Path $root 'port\build\fdump.exe'
 # start all replays first so they run side by side
 $runs = foreach ($g in $Games) {
     $src = Join-Path $root "cd\gameware\$g"
-    $rec = (Get-ChildItem $src -Filter *.rec | Select-Object -First 1).Name
+    $rec = if ($Recs) { 'GEN.REC' } else { (Get-ChildItem $src -Filter *.rec | Select-Object -First 1).Name }
     $gam = (Get-ChildItem $src -Filter *.gam | Select-Object -First 1).Name
-    $run = Join-Path $env:TEMP "gm_port_$g"
+    $run = Join-Path $env:TEMP "gm_port_$g$Tag"
     if (Test-Path $run) { Remove-Item -Recurse -Force $run }
     New-Item -ItemType Directory $run | Out-Null
     Copy-Item -Recurse (Join-Path $root 'runtime\run\GM') (Join-Path $run 'GM')
     Copy-Item -Recurse $src (Join-Path $run "GM\$g")
+    if ($Recs) { Copy-Item (Join-Path $Recs "$g.rec") (Join-Path $run "GM\$g\GEN.REC") }
     $env:FDUMP = Join-Path $run 'frames.bin'
     $env:FTRACE = Join-Path $run 'trace.txt'
+    $env:FDUMPMAX = "$MaxFrames"
     $p = Start-Process $exe -ArgumentList "$g\$rec", "$g\$gam" -PassThru -WorkingDirectory (Join-Path $run 'GM') `
          -RedirectStandardError (Join-Path $run 'err.txt') -RedirectStandardOutput (Join-Path $run 'out.txt')
     [pscustomobject]@{ Game = $g; Run = $run; Proc = $p }
@@ -48,8 +53,8 @@ function Strip-Timer($path) { Get-Content $path | Where-Object { $_ -match '^\d'
 foreach ($r in $runs) {
     $g = $r.Game
     $bin = Join-Path $r.Run 'frames.bin'
-    $dosBin = Join-Path $Work "$g.bin"
-    $dosTr = Join-Path $Work "$g.trace.txt"
+    $dosBin = Join-Path $Work "$g$Tag.bin"
+    $dosTr = Join-Path $Work "$g$Tag.trace.txt"
     if ($r.Timeout -or -not (Test-Path $bin)) { "{0,-10} NO RESULT (exit {1}) {2}" -f $g, $r.Proc.ExitCode, (Get-Content (Join-Path $r.Run 'err.txt') -TotalCount 3); continue }
 
     $a = @(Strip-Timer $dosTr); $b = @(Strip-Timer (Join-Path $r.Run 'trace.txt'))

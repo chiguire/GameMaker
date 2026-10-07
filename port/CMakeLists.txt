@@ -69,9 +69,6 @@ target_sources(gmplat PRIVATE src/dosplat.c src/dosfind.c)
 add_executable(gmplay src/gmplay_main.cpp $<TARGET_OBJECTS:engine_objs>)
 target_link_libraries(gmplay PRIVATE gmplat)
 
-# Build-time helper: turns a Windows raster .FON into the C glyph arrays in src/fonts.h.
-add_executable(fon2h tools/fon2h.c)
-
 # Timeline of a captured WAV (GM_WAV=...), to check audio output without listening.
 add_executable(wavstat tools/wavstat.c)
 if(NOT MSVC)

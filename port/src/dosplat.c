@@ -270,7 +270,8 @@ static uint8_t synth_down[NKEYS];           /* keys held by the GM_TYPE test hoo
 static uint16_t bios_buf[32];
 static int bios_n;
 
-static int shift_held(void) { return IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT); }
+static int synth_shift;                        /* GM_TYPE is typing a shifted character */
+static int shift_held(void) { return synth_shift || IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT); }
 
 static void raise_kbd(uint8_t code)
 {
@@ -313,6 +314,28 @@ static int find_key_for_char(char c, int *shift)
     return -1;
 }
 
+/* Maps a GM_TYPE escape letter to a raylib key, or -1. */
+static int escape_key(char e)
+{
+    switch (e) {
+    case 'n': return KEY_ENTER;
+    case 'b': return KEY_BACKSPACE;
+    case 'e': return KEY_ESCAPE;
+    case 'l': return KEY_LEFT;
+    case 'r': return KEY_RIGHT;
+    case 'u': return KEY_UP;
+    case 'd': return KEY_DOWN;
+    case '\\': return KEY_BACKSLASH;
+    default: return -1;
+    }
+}
+
+static int key_index(int rkey)
+{
+    for (int i = 0; i < NKEYS; i++) if (keymap[i].rkey == rkey) return i;
+    return -1;
+}
+
 static void type_keys(void)
 {
     static const char *buf;
@@ -328,28 +351,26 @@ static void type_keys(void)
     next = GetTime() + 0.08;
     if (held >= 0) {                                   /* release the key typed on the previous step */
         if (hold_left-- > 0) return;
-        synth_down[held] = 0; held = -1; return;
+        synth_down[held] = 0; synth_shift = 0; held = -1; return;
     }
     if (!buf[pos]) return;
+
+    int hold = 0, shift = 0, idx = -1;
     char c = buf[pos++];
-    int idx = -1, shift = 0, hold = 0;
-    if (c == '\\') {
-        char e = buf[pos++];
-        if (e == 'w') { next = GetTime() + ((buf[pos] - '0') * 10 + (buf[pos + 1] - '0')) * 0.08; pos += 2; return; }   /* \wNN: pause */
-        if (e == 'h') { hold = (buf[pos] - '0') * 10 + (buf[pos + 1] - '0'); pos += 2; c = buf[pos] == '\\' ? (pos++, buf[pos++]) : buf[pos++]; e = c; }
-        switch (e) {
-        case 'n': idx = 27; break;                      /* Enter */
-        default:
-            for (int i = 0; i < NKEYS; i++) {
-                int want = e == 'b' ? KEY_BACKSPACE : e == 'e' ? KEY_ESCAPE : e == 'l' ? KEY_LEFT : e == 'r' ? KEY_RIGHT :
-                           e == 'u' ? KEY_UP : e == 'd' ? KEY_DOWN : e == '\\' ? KEY_BACKSLASH : -1;
-                if (keymap[i].rkey == want) { idx = i; break; }
-            }
-        }
-        for (int i = 0; e == 'n' && i < NKEYS; i++) if (keymap[i].rkey == KEY_ENTER) idx = i;
-    } else idx = find_key_for_char(c, &shift);
+    if (c == '\\' && buf[pos] == 'w') {                /* \wNN: pause NN * 80 ms */
+        next = GetTime() + ((buf[pos + 1] - '0') * 10 + (buf[pos + 2] - '0')) * 0.08;
+        pos += 3;
+        return;
+    }
+    if (c == '\\' && buf[pos] == 'h') {                /* \hNN<key>: hold the next key NN * 80 ms */
+        hold = (buf[pos + 1] - '0') * 10 + (buf[pos + 2] - '0');
+        pos += 3;
+        c = buf[pos++];
+    }
+    if (c == '\\') idx = key_index(escape_key(buf[pos++]));  /* an escape such as \n or \r */
+    else           idx = find_key_for_char(c, &shift);        /* a plain character */
     if (idx < 0) return;
-    held = idx; hold_left = hold;
+    held = idx; hold_left = hold; synth_shift = shift;
     synth_down[idx] = 1;
 }
 

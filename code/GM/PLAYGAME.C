@@ -1373,7 +1373,7 @@ static boolean ShowGraphic(const char *File,RGBdata *NewCols,int PauseLen)
 /*   then 768 bytes of 6-bit VGA palette and 64000 bytes of A000:0.    */
 /*---------------------------------------------------------------------*/
 #define FDUMPEVERY 20
-#define FDUMPMAX   150
+#define FDUMPMAX   150          // default; $FDUMPMAX overrides (a recording normally ends itself with ESC)
 
 static void DumpFrame(void)
   {
@@ -1410,6 +1410,10 @@ static void DumpFrame(void)
             (unsigned long)Tick,(unsigned long)TimerCounter,(unsigned long)Rec->RecordTimer,
             Rec->RecIndex,PendCtr,chr.cseq,chr.cframe,chr.x[0],chr.y[0],doscene,
             ci.hitpts,ci.lives,(long)ci.score,nmon,monsum,chr.x[1],chr.y[1],ci.gravx,ci.gravy);
+    if (getenv("FSCROLL"))      // extra indented line: scroll state (the compare script ignores lines that do not start with a digit)
+      fprintf(tr,"  scroll m=%d,%d n=%d,%d mov=%d,%d tot=%d,%d ctr=%d,%d inmotion=%d next=%d,%d\n",
+              mx,my,scroll.nx,scroll.ny,scroll.movx,scroll.movy,scroll.Totalx,scroll.Totaly,
+              scroll.Movx.Ctr,scroll.Movy.Ctr,(int)scroll.InMotion,ci.nextx,ci.nexty);
     fflush(tr);
     }
   if (Tick%FDUMPEVERY) return;
@@ -1419,7 +1423,9 @@ static void DumpFrame(void)
     fp=fopen(name?name:"FRAMES.BIN","wb");
     if (fp==NULL) return;
     }
-  if (Count>=FDUMPMAX) { keydn[1]=1; return; }   // Quit the scene (ESC).
+  static int MaxFrames=0;
+  if (MaxFrames==0) MaxFrames=getenv("FDUMPMAX") ? atoi(getenv("FDUMPMAX")) : FDUMPMAX;
+  if (Count>=MaxFrames) { keydn[1]=1; return; }   // Quit the scene (ESC).
   Count++;
   GetAllPal(Pal);
   tick=Tick; timer=TimerCounter; score=(long)ci.score;
@@ -1460,14 +1466,21 @@ static int playscene(int dosc,int prev,int &link)
   linkin           = link;
 
   /* Allocate Memory */
-  if (blks[0]==NULL) blks[0] = new blkstruct [BACKBL+1];
+#ifdef GM_PORT
+  // blkmap/nextbl are bytes, and some games (peach, zark) have junk nextbl values > BACKBL in unused blocks;
+  // DOS read whatever lay beyond the array, here that must at least be valid memory.
+  #define BACKALLOC 256
+#else
+  #define BACKALLOC (BACKBL+1)
+#endif
+  if (blks[0]==NULL) blks[0] = new blkstruct [BACKALLOC];
   if (blks[1]==NULL) blks[1] = new blkstruct [MONBL+1];
   if (blks[2]==NULL) blks[2] = new blkstruct [CHARBL+1];
 #if defined(GM_PORT) || defined(FRAMEDUMP)
   // The extra entry at the end of each array is the "no block here" sentinel (index BACKBL etc.) that
   // chkrights() and friends read.  The original never initialises it, so what it holds in DOS is whatever
   // the far heap contained before.  Make it well defined (all zero: not solid) so runs are repeatable.
-  memset(&blks[0][BACKBL],0,sizeof(blkstruct));
+  memset(&blks[0][BACKBL],0,sizeof(blkstruct)*(BACKALLOC-BACKBL));
   memset(&blks[1][MONBL] ,0,sizeof(blkstruct));
   memset(&blks[2][CHARBL],0,sizeof(blkstruct));
 #endif
@@ -3774,7 +3787,7 @@ static unsigned int chkups(touchblk *t)
   int twohigh=2;
 
   if ((t->blks[0][0]) !=MLEN) twohigh=0;
-  
+
   if (t->blknum[twohigh] !=BACKBL)
     {
     if (t->blknum[4] !=BACKBL) spots[2] |= blks[0][t->blknum[4]].solid&SOLRIG;
@@ -3806,8 +3819,8 @@ static unsigned int chkdowns(touchblk *t)
   if ((t->blks[0][0]) !=MLEN) twohigh=0; 
 
   if (t->blknum[4] !=BACKBL)  // Don't do if not even touching
-    { 
-    spots[2] |= blks[0][t->blknum[4]].solid&SOLRIG; 
+    {
+    spots[2] |= blks[0][t->blknum[4]].solid&SOLRIG;
     if (t->blknum[twohigh] != BACKBL) spots[0] |= blks[0][t->blknum[twohigh]].solid&SOLRIG;
     if (!((spots[2]&SOLRIG)&&(spots[0]&SOLRIG))) 
       spots[2] |= (blks[0][t->blknum[4]].solid&SOLTOP);
@@ -4074,7 +4087,7 @@ static int ChangeScroll(void)
   if (scroll.InMotion&SOLLEF)
     {
     if (tmx<scroll.LeftStop) scroll.InMotion &= ~SOLLEF;
-    else scroll.Totalx= ((tmx-scroll.LeftStop)*SCRSPDX)/(scroll.MaxX-scroll.LeftStop);
+    else scroll.Totalx= ((int)((tmx-scroll.LeftStop)*SCRSPDX))/(scroll.MaxX-scroll.LeftStop);  // (int): 16-bit overflow of the product is part of the original behaviour
     //                ^this formula is distributes the speed 1-SCRSPDX across
     //                the Screen distance (scroll.LeftStop -> scroll.MaxX)
     //                linearly. (ie it is really (X*MAXSPEED)/MAXX)
@@ -4082,17 +4095,17 @@ static int ChangeScroll(void)
   if (scroll.InMotion&SOLRIG)
     {
     if (tmx>scroll.RightStop) scroll.InMotion &= ~SOLRIG;
-    else scroll.Totalx=-((-tmx+scroll.RightStop)*SCRSPDX)/(scroll.RightStop-scroll.MinX);
+    else scroll.Totalx=-((int)((-tmx+scroll.RightStop)*SCRSPDX))/(scroll.RightStop-scroll.MinX);
     }
   if (scroll.InMotion&SOLTOP)
     {
     if (tmy<scroll.UpStop) scroll.InMotion &= ~SOLTOP;
-    else scroll.Totaly= ((tmy-scroll.UpStop)*SCRSPDY)/(scroll.MaxY-scroll.UpStop);
+    else scroll.Totaly= ((int)((tmy-scroll.UpStop)*SCRSPDY))/(scroll.MaxY-scroll.UpStop);
     }
   if (scroll.InMotion&SOLBOT)
     {
     if (tmy>scroll.DownStop) scroll.InMotion &= ~SOLBOT;
-    else scroll.Totaly=- ((-tmy+scroll.DownStop)*SCRSPDY)/(scroll.DownStop-scroll.MinY);
+    else scroll.Totaly=- ((int)((-tmy+scroll.DownStop)*SCRSPDY))/(scroll.DownStop-scroll.MinY);
     }
 
   if (scroll.Totaly>28)  scroll.Totaly=28;
