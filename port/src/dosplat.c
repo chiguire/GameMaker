@@ -545,12 +545,24 @@ static void fire_timer(void)
     double now = gm_os_time();
     double period = (pit_divisor ? pit_divisor : 0x10000) / 1193182.0;
     if (next_tick == 0) next_tick = now + period;
-    int budget = 8;                                  /* don't spiral after a stall */
+    static unsigned fired, dropped;
+    static double next_report;
+    /* Catch up on ticks missed while the engine was busy (the music's tempo and the game's clock count them); only a
+     * long stall (about 1.4 s) is given up on so that this cannot spiral. A small budget here made music slow and
+     * uneven in the browser, where the main loop is often held up for longer than a few ticks. */
+    int budget = 200;
     while (now >= next_tick && budget--) {
         next_tick += period;
+        fired++;
         if (vectors[8] && !(pic_mask & 1)) { in_isr++; vectors[8](); in_isr--; }
     }
-    if (now >= next_tick) next_tick = now + period;
+    if (now >= next_tick) { dropped += (unsigned)((now - next_tick) / period) + 1; next_tick = now + period; }
+    if (getenv("GM_TIMERLOG") && now >= next_report) {       /* test aid: how many timer ticks the engine got */
+        unsigned audio_fed, audio_starved;
+        gm_audio_stats(&audio_fed, &audio_starved);
+        if (next_report) fprintf(stderr, "timer: %u ticks fired, %u dropped; audio: %u chunks fed, %u starved; %u pumps\n", fired, dropped, audio_fed, audio_starved, (unsigned)gm_heartbeat);
+        next_report = now + 5.0;
+    }
 }
 
 #ifdef __EMSCRIPTEN__
@@ -629,9 +641,12 @@ void gm_pump(void)
  * ------------------------------------------------------------------------------------------- */
 void gm_mouse_show(int16_t on) { mouse_shown = on; }
 
+static int32_t headless_mx, headless_my;     /* headless: the pointer stays where the engine last put it, like a still mouse */
+
 void gm_mouse_get(int32_t *vx, int32_t *vy, int32_t *buttons)
 {
-    if (!window_open || headless) { *vx = *vy = *buttons = 0; return; }
+    if (headless) { *vx = headless_mx; *vy = headless_my; *buttons = 0; return; }
+    if (!window_open) { *vx = *vy = *buttons = 0; return; }
     Vector2 p = GetMousePosition();
     float s = (float)GetRenderWidth() / (float)GetScreenWidth();   /* DPI scale: render px per logical px */
     float nx = (p.x * s - game_rect.x) / game_rect.w, ny = (p.y * s - game_rect.y) / game_rect.h;
@@ -645,7 +660,8 @@ void gm_mouse_get(int32_t *vx, int32_t *vy, int32_t *buttons)
 
 void gm_mouse_set(int32_t vx, int32_t vy)
 {
-    if (!window_open || headless) return;
+    if (headless) { headless_mx = vx; headless_my = vy; return; }
+    if (!window_open) return;
     float s = (float)GetRenderWidth() / (float)GetScreenWidth();
     SetMousePosition((int)((game_rect.x + vx / 639.0f * game_rect.w) / s), (int)((game_rect.y + vy / 199.0f * game_rect.h) / s));
 }

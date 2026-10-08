@@ -39,7 +39,19 @@ int  g_volume = 100;                 /* master volume 0..100, applied where samp
 bool g_mute;
 
 uint64_t g_synth_pos;                /* samples synthesised so far */
-constexpr double LATENCY = 1536;     /* samples the synthesis clock runs ahead of the wall clock */
+bool g_device_ok;                    /* a real output device is playing (set in ensure_device) */
+
+/* Samples the synthesis clock runs ahead of the wall clock. With a real device this must exceed what the device holds
+ * (two 1024-sample buffers): when the ring is shorter the device is fed partial chunks, which cuts continuous sound
+ * (music) into pieces and makes it sound slow. Tests and captures keep the small value. */
+constexpr double LATENCY_TEST = 1536;
+#ifdef __EMSCRIPTEN__
+#define GM_CHUNK 2048
+constexpr double LATENCY_DEVICE = 3 * GM_CHUNK;   /* the ring must hold a whole chunk even right after the device took two */
+#else
+#define GM_CHUNK 1024
+constexpr double LATENCY_DEVICE = LATENCY_TEST;
+#endif
 constexpr uint32_t MAX_CATCHUP = 8192;
 
 /* ---- voices ---------------------------------------------------------------------------------------- */
@@ -75,7 +87,7 @@ int16_t next_sample()
 void render_to_now()
 {
     ensure_opl();
-    double target = now_seconds() * GM_AUDIO_RATE + LATENCY;
+    double target = now_seconds() * GM_AUDIO_RATE + (g_device_ok ? LATENCY_DEVICE : LATENCY_TEST);
     if (target - (double)g_synth_pos > MAX_CATCHUP) g_synth_pos = (uint64_t)target - 2048;   /* stalled: skip ahead */
     while ((double)g_synth_pos < target && g_wr - g_rd < RING) {
         g_ring[g_wr++ % RING] = next_sample();
@@ -127,9 +139,12 @@ void wav_write(const int16_t *s, uint32_t n)
 
 /* ---- raylib device --------------------------------------------------------------------------------- */
 AudioStream g_stream;
-bool g_device_tried, g_device_ok, g_headless;
+bool g_device_tried, g_headless;
+uint32_t g_fed, g_starved;           /* chunks sent to the device / times it wanted one and the ring was short (GM_SOUNDLOG) */
 
-constexpr int CHUNK = 1024;
+/* The size of one device buffer (the stream has two). In the browser the audio callback asks for far more than 2 x 1024
+ * samples at a time and the rest of each call would be silence, so the buffers are larger there (see LATENCY_DEVICE). */
+constexpr int CHUNK = GM_CHUNK;
 
 void ensure_device()
 {
@@ -217,8 +232,14 @@ void gm_audio_pump(void)
     }
     while (IsAudioStreamProcessed(g_stream)) {
         int16_t chunk[CHUNK];
+#ifdef __EMSCRIPTEN__
+        if (g_wr - g_rd < CHUNK) { g_starved++; break; }          /* only whole chunks: padding with silence cuts the music */
+        g_fed++;
+        gm_audio_drain(chunk, CHUNK);
+#else
         uint32_t got = gm_audio_drain(chunk, CHUNK);
         if (got < CHUNK) std::memset(chunk + got, 0, (CHUNK - got) * sizeof(int16_t));   /* underrun: silence */
+#endif
         wav_write(chunk, CHUNK);                                  /* captures keep the unscaled mix */
         float g = g_mute ? 0.0f : (float)(g_volume * g_volume) / 10000.0f;   /* squared: loudness follows the slider */
         if (g != 1.0f) for (uint32_t i = 0; i < CHUNK; i++) chunk[i] = (int16_t)(chunk[i] * g);
@@ -232,11 +253,13 @@ void gm_audio_shutdown(void)
 {
     if (!g_device_ok) return;
     g_device_ok = false;
+    if (std::getenv("GM_SOUNDLOG")) std::fprintf(stderr, "audio: %u chunks fed, %u times starved\n", g_fed, g_starved);
     UnloadAudioStream(g_stream);
     CloseAudioDevice();
 }
 
 void gm_audio_set_headless(int on) { g_headless = on != 0; }
+void gm_audio_stats(unsigned *fed, unsigned *starved) { *fed = g_fed; *starved = g_starved; }
 void gm_audio_set_volume(int pct) { g_volume = pct < 0 ? 0 : (pct > 100 ? 100 : pct); }
 int  gm_audio_volume(void) { return g_volume; }
 void gm_audio_set_mute(int on) { g_mute = on != 0; }
