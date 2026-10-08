@@ -658,11 +658,22 @@ uint8_t gm_inportb(uint16_t port)
     switch (port) {
     case 0x3DA: {                       /* VGA input status: bit3 vertical retrace, bit0 display disabled */
         static uint32_t n;
+        static long last_frame = -1;
         gm_pump();
         n++;
-        double ph = headless ? (double)(n & 15) / 16.0              /* test mode: retrace comes round every 16 reads, no waiting */
-                             : fmod(gm_os_time() * 70.0, 1.0);
-        return (uint8_t)((ph > 0.93 ? 8 : 0) | (n & 1));
+        int retrace;
+        if (headless) {
+            retrace = (n & 15) == 15;                       /* test mode: retrace comes round every 16 reads, no waiting */
+        } else {
+            /* One retrace per 70 Hz frame: the bit is set at the first read after the frame boundary and clear for the rest
+             * of the frame. (A fixed 1 ms window is caught by a loop that polls constantly, but a browser build only gets to
+             * poll every few milliseconds, misses most windows, and every fade and wipe in the games runs several times
+             * too slowly.) */
+            long frame = (long)(gm_os_time() * 70.0);
+            retrace = frame != last_frame;
+            if (retrace) last_frame = frame;
+        }
+        return (uint8_t)((retrace ? 8 : 0) | (n & 1));
     }
     case 0x3C9:
         if (dac_rd_idx < 256) {

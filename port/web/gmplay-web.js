@@ -296,7 +296,7 @@
       document.addEventListener('visibilitychange', () => { if (document.hidden) persistNow(); });
       Module.callMain(args);
     } catch (e) {
-      show('picker', true);
+      show(window.GM_STANDALONE ? 'standalone' : 'picker', true);
       fatal(e.message || String(e));
     }
   }
@@ -337,7 +337,7 @@
       const files = await unzip(await r.arrayBuffer());
       await startGame(files);
     } catch (e) {
-      show('picker', true);
+      show(window.GM_STANDALONE ? 'standalone' : 'picker', true);
       fatal(e.message || String(e));
     }
   }
@@ -383,13 +383,49 @@
     $('pick-zip').onchange = async (e) => startGame(await filesFromList(e.target.files));
   }
 
+  // A single-file build (build_web.sh --standalone): the page, the engine and one game in one HTML file, which opens from
+  // disk. The build defines window.GM_STANDALONE = { name } and window.GM_GAME_ZIP (bytes) before this script's init() runs
+  // its last line, and puts the inlined engine after this script.
+  function setupStandalone(sa) {
+    document.title = sa.name + ' - GameMaker';
+    $('title-h1').textContent = sa.name;
+    $('subtitle').textContent = 'A game made with GameMaker (1994)';
+    show('bundled-box', false);
+    show('picker', false);
+    show('standalone', true);
+    $('sa-play').onclick = async () => {
+      show('standalone', false);
+      try {
+        const z = window.GM_GAME_ZIP;
+        await startGame(await unzip(z.buffer.slice(z.byteOffset, z.byteOffset + z.byteLength)));
+      } catch (e) {
+        show('standalone', true);
+        fatal(e.message || String(e));
+      }
+    };
+  }
+
+  // The single-file build stores binary data (the engine's .wasm, the game's zip) as hex text.
+  window.gmHex2Bytes = function (h) {
+    const n = h.length >> 1, b = new Uint8Array(n);
+    for (let i = 0; i < n; i++) {
+      const c1 = h.charCodeAt(2 * i), c2 = h.charCodeAt(2 * i + 1);
+      b[i] = (((c1 & 15) + (c1 > 57 ? 9 : 0)) << 4) | ((c2 & 15) + (c2 > 57 ? 9 : 0));
+    }
+    return b;
+  };
+
   function init() {
     if (!window.WebAssembly) { fatal('This browser does not support WebAssembly.'); return; }
     $('log-toggle').onclick = () => $('log').classList.toggle('hidden');
     $('again').onclick = () => location.reload();
-    setupDrop();
-    listBundled();
-    loadEngine();
+    if (window.GM_STANDALONE) {
+      setupStandalone(window.GM_STANDALONE);      // the engine is inlined in the same file
+    } else {
+      setupDrop();
+      listBundled();
+      loadEngine();
+    }
     window.addEventListener('error', (e) => log('Error: ' + e.message, true));
   }
   init();

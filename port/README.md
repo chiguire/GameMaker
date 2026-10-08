@@ -210,6 +210,12 @@ Things learned the hard way, so they do not have to be rediscovered.
 - **Array indices that DOS got away with.** `blkmap`/`nextbl` are bytes (up to 255) but `blks[0]` has 150 entries, and
   peach and zark have junk `nextbl` values (255, 249) in unused blocks. DOS read whatever followed the array; a 64-bit
   heap faults. The port allocates 256 entries (`GM_PORT` only, because 256 blocks do not fit one far allocation).
+- **Waiting for the vertical retrace.** Every fade and wipe does `while ((inport(0x3DA)&8)==0);`. The emulated retrace used
+  to be a 1 ms window in each 14 ms frame, which a loop polling constantly catches but a browser build, which can only
+  poll every few milliseconds (each poll is a yield to the browser), mostly misses: a 1 second fade took about 11 seconds
+  (measured on the Sample game's title). The bit is now raised once per 70 Hz frame, at the first poll after the frame
+  boundary, so the wait ends within one poll interval however coarse the polling is; the same fade takes 1.2 s in the
+  browser. Replays are unaffected: windowed replays on Windows still match DOS in every tick and pixel (bcuda, houses, volume, zark re-run after the change), and the headless test mode uses its own fixed pattern of reads.
 - **Wall-clock time leaks into game logic.** Monsters compare absolute clock values, and DOS loading time advanced the
   clock between scenes. Replays are only repeatable with the deterministic clock described in baseline/README.md.
 
@@ -255,6 +261,15 @@ bash port/build_web.sh                      # -> port/web-dist/ and port/web-dis
 bash port/build_web.sh --games houses,donut # or choose the games (names; "all" = every GameMaker 3.0 game; "none")
 bash port/build_web.sh --out /srv/www/gm    # or put it somewhere else
 ```
+
+**One game, one file.** `bash port/build_web.sh --standalone houses` makes `port/web-standalone/houses.html` (about 1.7 MB):
+the page, the engine and that game in a single HTML file. It opens from disk with a double click, with no web server and
+no other files; it shows the game's name and a Play button (no game list, no drop zone), and keeps scores and settings
+in the browser as the site does. The binary parts (the `.wasm`, the game's zip) are stored in the file as hex text and
+decoded when the page loads. It takes one game; the same folder gets the README and the licence files, and a `.zip`.
+Tried in Chrome 154 only (opened as a `file://` URL: Play, menu keys, saving to IndexedDB all worked). Other browsers
+restrict pages opened from disk in their own ways; if one refuses to save, the page says so and the game still plays,
+but keeps nothing.
 
 The folder is a static site: copy it to any web server, no special headers or server software. To try it locally run
 `python3 -m http.server 8000` inside it and open <http://localhost:8000/> (not `file://`: browsers will not load `.wasm`

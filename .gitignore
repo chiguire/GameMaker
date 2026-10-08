@@ -3,3 +3,5 @@ port/build*/
 pt_work/
 port/web-dist/
 port/web-dist.zip
+port/web-standalone/
+port/web-standalone.zip

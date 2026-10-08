@@ -2,11 +2,15 @@
 # One step from the source to a web-ready folder: builds the player as WebAssembly and packs it with the page and the
 # games you choose. The result is a static site (any web server) and a .zip of the same folder.
 #
-#   bash port/build_web.sh [--games LIST] [--out DIR]
+#   bash port/build_web.sh [--games LIST | --standalone GAME] [--out DIR]
 #
 #     --games LIST   games to pack in: names separated by commas (sample,houses), "all" (every GameMaker 3.0 game in
 #                    cd/gameware) or "none". Default: sample. Players can always drop their own game folders on the page.
-#     --out DIR      output folder (default: port/web-dist); DIR.zip is written next to it
+#     --standalone GAME
+#                    instead of a site: ONE html file with the player and that one game inside (GAME.html). It opens
+#                    from disk with a double click (no web server, no other files) and starts with a Play button.
+#     --out DIR      output folder (default: port/web-dist, or port/web-standalone with --standalone); DIR.zip is
+#                    written next to it
 #
 # Needs Emscripten (https://emscripten.org/docs/getting_started/downloads.html), cmake and git (CMake fetches raylib
 # and ymfm). The emsdk is taken from the current shell if `emcmake` is on the PATH, otherwise from $EMSDK or ~/emsdk:
@@ -17,7 +21,8 @@
 set -e
 here=$(cd "$(dirname "$0")" && pwd)
 games=sample
-out="$here/web-dist"
+standalone=""
+out=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -25,10 +30,20 @@ while [ $# -gt 0 ]; do
     --games=*) games=${1#--games=}; shift ;;
     --out) out=$2; shift 2 ;;
     --out=*) out=${1#--out=}; shift ;;
-    -h|--help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --standalone) standalone=$2; shift 2 ;;
+    --standalone=*) standalone=${1#--standalone=}; shift ;;
+    -h|--help) awk 'NR>1 && /^#/ { sub(/^# ?/, ""); print; next } NR>1 { exit }' "$0"; exit 0 ;;
     *) echo "build_web.sh: unknown option $1 (try --help)" >&2; exit 2 ;;
   esac
 done
+
+case "$standalone" in
+  *,*) echo "build_web.sh: --standalone takes one game (a single file holds one game); use --games for several." >&2; exit 2 ;;
+esac
+if [ -n "$standalone" ]; then games=$standalone; fi        # the check below then applies to it
+if [ -z "$out" ]; then
+  if [ -n "$standalone" ]; then out="$here/web-standalone"; else out="$here/web-dist"; fi
+fi
 
 if ! command -v emcmake >/dev/null 2>&1; then
   sdk=${EMSDK:-$HOME/emsdk}
@@ -77,10 +92,14 @@ if command -v ninja >/dev/null 2>&1; then gen="-G Ninja"; fi
 list=$(printf '%s' "$games" | tr ',' ';')
 
 emcmake cmake -S "$here" -B "$build" $gen -DCMAKE_BUILD_TYPE=Release -DGM_WEB_TARGET=browser \
-  "-DGM_WEB_GAMES=$list" "-DGM_WEB_OUT=$out"
+  "-DGM_WEB_GAMES=$list" "-DGM_WEB_OUT=$out" "-DGM_WEB_STANDALONE=$standalone"
 cmake --build "$build" --target web_dist
 
 echo
 echo "Ready: $out"
 echo "       $out.zip"
-echo "Try it:  cd \"$out\" && python3 -m http.server 8000   then open http://localhost:8000/"
+if [ -n "$standalone" ]; then
+  echo "Play it: open $out/$standalone.html in a browser (double-click; no server needed)"
+else
+  echo "Try it:  cd \"$out\" && python3 -m http.server 8000   then open http://localhost:8000/"
+fi

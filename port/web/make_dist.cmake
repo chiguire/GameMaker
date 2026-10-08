@@ -19,6 +19,15 @@ foreach(f gmplay.js gmplay.wasm)
   endif()
 endforeach()
 
+# GM_STANDALONE=<game> (optional): instead of a site with a game list, make ONE html file holding the page, the engine and
+# that single game, which opens from disk with a double click (no web server) and starts with a Play button.
+if(NOT DEFINED GM_STANDALONE)
+  set(GM_STANDALONE "")
+endif()
+if(NOT GM_STANDALONE STREQUAL "")
+  set(GM_GAMES "${GM_STANDALONE}")
+endif()
+
 file(REMOVE_RECURSE "${GM_OUT}")
 file(MAKE_DIRECTORY "${GM_OUT}/games")
 
@@ -97,6 +106,34 @@ foreach(g ${wanted})
 endforeach()
 file(WRITE "${GM_OUT}/games.json" "[\n${json}\n]\n")
 
+# ---- standalone: everything in one html file ----------------------------------------------------------------------------
+if(NOT GM_STANDALONE STREQUAL "")
+  set(g "${GM_STANDALONE}")
+  file(READ "${GM_WEB_SRC}/index.html" page)
+  file(READ "${GM_WEB_SRC}/gmplay-web.js" page_js)
+  file(READ "${GM_BUILD_DIR}/gmplay.js" engine_js)
+  file(READ "${GM_BUILD_DIR}/gmplay.wasm" wasm_hex HEX)       # binary data travels as hex text, decoded by gmHex2Bytes()
+  file(READ "${GM_OUT}/games/${g}.zip" zip_hex HEX)
+  string(REPLACE "</script" "<\\/script" page_js "${page_js}")  # nothing may end the inline <script> early
+  string(REPLACE "</script" "<\\/script" engine_js "${engine_js}")
+  string(SUBSTRING "${g}" 0 1 first)
+  string(TOUPPER "${first}" first)
+  string(SUBSTRING "${g}" 1 -1 rest)
+  set(marker "<script src=\"gmplay-web.js\"></script>")
+  string(FIND "${page}" "${marker}" marker_at)
+  if(marker_at EQUAL -1)
+    message(FATAL_ERROR "make_dist.cmake: web/index.html no longer contains ${marker}")
+  endif()
+  # order matters: the flag first, then the page script (it creates `Module` and sets the page up), then the data the
+  # engine needs, then the engine itself, which starts compiling the embedded .wasm as soon as it runs
+  string(REPLACE "${marker}"
+    "<script>window.GM_STANDALONE = { name: \"${first}${rest}\" };</script>\n<script>\n${page_js}\n</script>\n<script>\nModule.wasmBinary = gmHex2Bytes(\"${wasm_hex}\");\nwindow.GM_GAME_ZIP = gmHex2Bytes(\"${zip_hex}\");\n</script>\n<script>\n${engine_js}\n</script>"
+    page "${page}")
+  file(WRITE "${GM_OUT}/${g}.html" "${page}")
+  file(REMOVE_RECURSE "${GM_OUT}/games" "${GM_OUT}/games.json" "${GM_OUT}/index.html" "${GM_OUT}/gmplay-web.js"
+    "${GM_OUT}/gmplay.js" "${GM_OUT}/gmplay.wasm")
+endif()
+
 # ---- notices ----------------------------------------------------------------------------------------------------------
 file(COPY "${GM_REPO}/LICENSE" DESTINATION "${GM_OUT}")
 file(COPY "${GM_REPO}/port/THIRD_PARTY.md" "${GM_REPO}/port/licenses" DESTINATION "${GM_OUT}")
@@ -105,6 +142,18 @@ string(REPLACE ";" ", " packed_text "${packed}")
 if(npacked EQUAL 0)
   set(packed_text "(none: players drop their own game folders on the page)")
 endif()
+if(NOT GM_STANDALONE STREQUAL "")
+  file(WRITE "${GM_OUT}/README.txt"
+"${GM_STANDALONE}.html is a complete game in one file: the 1994 GameMaker engine (compiled to WebAssembly) and the game ${GM_STANDALONE}.
+
+To play, open ${GM_STANDALONE}.html in a current Chrome, Edge, Firefox or Safari (double-click it, or put it on any web
+server) and press Play. No server and no other files are needed. Scores, saved games and settings are kept in the browser.
+Esc is kept for the game in full screen on Chrome and Edge only. Touch screens are not supported.
+
+LICENSE, THIRD_PARTY.md and licenses/ hold the licences of the engine and of what it builds on. The game itself is not
+covered by them: publish it only if you have the right to distribute it.
+")
+else()
 file(WRITE "${GM_OUT}/README.txt"
 "GameMaker Player for the web
 ============================
@@ -132,6 +181,7 @@ distribute. Rebuild with a different list:  bash port/build_web.sh --games none 
 Browsers: current Chrome, Edge, Firefox and Safari (WebAssembly, DecompressionStream for zip files). Esc is kept for the
 game in full screen on Chrome and Edge only. Touch screens are not supported.
 ")
+endif()
 
 # ---- one file to hand around ------------------------------------------------------------------------------------------
 get_filename_component(out_name "${GM_OUT}" NAME)
@@ -143,6 +193,11 @@ if(NOT rc EQUAL 0)
   message(WARNING "make_dist.cmake: could not make ${out_parent}/${out_name}.zip")
 endif()
 
-file(SIZE "${GM_OUT}/gmplay.wasm" wasm_bytes)
-message(STATUS "Web distributable ready: ${GM_OUT}  (games: ${packed_text}; gmplay.wasm ${wasm_bytes} bytes)")
+if(NOT GM_STANDALONE STREQUAL "")
+  file(SIZE "${GM_OUT}/${GM_STANDALONE}.html" html_bytes)
+  message(STATUS "Standalone game ready: ${GM_OUT}/${GM_STANDALONE}.html  (${html_bytes} bytes, opens by double-click)")
+else()
+  file(SIZE "${GM_OUT}/gmplay.wasm" wasm_bytes)
+  message(STATUS "Web distributable ready: ${GM_OUT}  (games: ${packed_text}; gmplay.wasm ${wasm_bytes} bytes)")
+endif()
 message(STATUS "                         and ${out_parent}/${out_name}.zip")

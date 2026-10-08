@@ -149,7 +149,8 @@ if(EMSCRIPTEN)
   if(GM_WEB_TARGET STREQUAL "browser")
     # The page decides when the engine starts (INVOKE_RUN=0) and which files it sees; IDBFS keeps scores and settings.
     target_link_options(gmplay PRIVATE -sENVIRONMENT=web -sINVOKE_RUN=0 -sFORCE_FILESYSTEM=1 -lidbfs.js
-      -sEXIT_RUNTIME=0                    # the page keeps working after the game ends; the engine reports its end itself (gmplay_main.cpp)
+      -sINCOMING_MODULE_JS_API=arguments,canvas,noInitialRun,noExitRuntime,onAbort,onExit,onRuntimeInitialized,postRun,preRun,print,printErr,locateFile,wasmBinary,instantiateWasm,setStatus,thisProgram,ENVIRONMENT,preinitializedWebGLContext,elementPointerLock,onFullScreen   # incl. wasmBinary: the single-file build embeds the .wasm
+      -sEXIT_RUNTIME=0                   # the page keeps working after the game ends; the engine reports its end itself (gmplay_main.cpp)
       "-sEXPORTED_FUNCTIONS=_main,_gm_web_command" "-sEXPORTED_RUNTIME_METHODS=FS,callMain,HEAPF32,HEAP32,HEAPU8,HEAPU32,HEAP16,HEAPU16"
       --pre-js ${CMAKE_CURRENT_SOURCE_DIR}/web/web_pre.js)
 
@@ -158,9 +159,12 @@ if(EMSCRIPTEN)
     #   -DGM_WEB_OUT=<folder>          where it goes (default: <build dir>/web)
     set(GM_WEB_GAMES "sample" CACHE STRING "games to pack into the web distributable (names, all or none)")
     set(GM_WEB_OUT "${CMAKE_BINARY_DIR}/web" CACHE PATH "web distributable folder")
+    #   -DGM_WEB_STANDALONE=<game>     one html file with the player and that game inside, no server needed (see make_dist.cmake)
+    set(GM_WEB_STANDALONE "" CACHE STRING "make a single self-contained html file for this game")
     add_custom_target(web_dist ALL
       COMMAND ${CMAKE_COMMAND} -DGM_BUILD_DIR=${CMAKE_BINARY_DIR} -DGM_WEB_SRC=${CMAKE_CURRENT_SOURCE_DIR}/web
         -DGM_REPO=${CMAKE_CURRENT_SOURCE_DIR}/.. "-DGM_GAMES=${GM_WEB_GAMES}" -DGM_OUT=${GM_WEB_OUT}
+        "-DGM_STANDALONE=${GM_WEB_STANDALONE}"
         -P ${CMAKE_CURRENT_SOURCE_DIR}/web/make_dist.cmake
       DEPENDS gmplay
       COMMENT "Assembling the web distributable"
