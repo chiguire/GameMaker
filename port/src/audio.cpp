@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <vector>
 
@@ -127,6 +128,7 @@ void wav_write(const int16_t *s, uint32_t n)
 /* ---- raylib device --------------------------------------------------------------------------------- */
 AudioStream g_stream;
 bool g_device_tried, g_device_ok, g_headless;
+
 constexpr int CHUNK = 1024;
 
 void ensure_device()
@@ -222,6 +224,16 @@ void gm_audio_pump(void)
         if (g != 1.0f) for (uint32_t i = 0; i < CHUNK; i++) chunk[i] = (int16_t)(chunk[i] * g);
         UpdateAudioStream(g_stream, chunk, CHUNK);
     }
+}
+
+/* Closes the audio device (the browser page does this when the game ends: a WebAudio node keeps calling back into
+ * the module otherwise). Silent afterwards. */
+void gm_audio_shutdown(void)
+{
+    if (!g_device_ok) return;
+    g_device_ok = false;
+    UnloadAudioStream(g_stream);
+    CloseAudioDevice();
 }
 
 void gm_audio_set_headless(int on) { g_headless = on != 0; }

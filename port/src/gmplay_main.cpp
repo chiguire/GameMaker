@@ -317,6 +317,20 @@ static void usage()
     );
 }
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+// In the browser the module stays alive after the engine finishes (-sEXIT_RUNTIME=0), so that the page keeps working:
+// saving the last scores, showing the end screen, reacting to keys that arrive late. The page is told here instead.
+static void page_notify(int code)
+{
+    static bool done;
+    if (done) return;
+    done = true;
+    gm_audio_shutdown();                              // a WebAudio node must not keep calling into a finished game
+    EM_ASM({ if (window.gmEngineExited) window.gmEngineExited($0); }, code);
+}
+#endif
+
 int main(int argc, char *argv[])
 {
 #ifdef _WIN32
@@ -383,5 +397,12 @@ int main(int argc, char *argv[])
         for (const auto &p : positional) args.push_back((char *)p.c_str());
     }
     args.push_back(nullptr);
+#ifdef __EMSCRIPTEN__
+    atexit([] { page_notify(0); });                  // the engine also ends through exit() on some paths
+    int rc = (int)gm_main_entry((int32_t)args.size() - 1, args.data());
+    page_notify(rc);
+    return rc;
+#else
     return gm_main_entry((int32_t)args.size() - 1, args.data());
+#endif
 }

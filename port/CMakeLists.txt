@@ -135,7 +135,7 @@ if(EMSCRIPTEN)
   # Every wait in the engine is a loop that calls gm_pump(); Asyncify lets that code park itself so that the browser
   # (or Node) can run in between (see gm_os_yield in src/dosfind.c).
   #   GM_WEB_TARGET=node     runs under Node with the real file system: used to replay recordings and compare with DOS
-  #   GM_WEB_TARGET=browser  (not built yet)
+  #   GM_WEB_TARGET=browser  a page (web/) that loads a game into an in-memory file system; "web_dist" assembles it
   set(GM_WEB_TARGET "node" CACHE STRING "node or browser")
   set_target_properties(gmplay PROPERTIES SUFFIX ".js")
   target_link_options(gmplay PRIVATE -sASYNCIFY=1 -sASYNCIFY_STACK_SIZE=524288 -sSTACK_SIZE=2097152
@@ -145,6 +145,26 @@ if(EMSCRIPTEN)
     # <build dir>/gmplay-node runs it like a native program (baseline/check_states.sh: GMPLAY=<build dir>/gmplay-node)
     file(WRITE ${CMAKE_BINARY_DIR}/gmplay-node "#!/bin/sh\nexec node \"${CMAKE_BINARY_DIR}/gmplay.js\" \"$@\"\n")
     file(CHMOD ${CMAKE_BINARY_DIR}/gmplay-node PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+  endif()
+  if(GM_WEB_TARGET STREQUAL "browser")
+    # The page decides when the engine starts (INVOKE_RUN=0) and which files it sees; IDBFS keeps scores and settings.
+    target_link_options(gmplay PRIVATE -sENVIRONMENT=web -sINVOKE_RUN=0 -sFORCE_FILESYSTEM=1 -lidbfs.js
+      -sEXIT_RUNTIME=0                    # the page keeps working after the game ends; the engine reports its end itself (gmplay_main.cpp)
+      "-sEXPORTED_FUNCTIONS=_main,_gm_web_command" "-sEXPORTED_RUNTIME_METHODS=FS,callMain,HEAPF32,HEAP32,HEAPU8,HEAPU32,HEAP16,HEAPU16"
+      --pre-js ${CMAKE_CURRENT_SOURCE_DIR}/web/web_pre.js)
+
+    # One step to a folder that can be put on any static web server:  cmake --build <dir> --target web_dist
+    #   -DGM_WEB_GAMES=sample          games packed into it: names separated by ";" or ",", "all" or "none"
+    #   -DGM_WEB_OUT=<folder>          where it goes (default: <build dir>/web)
+    set(GM_WEB_GAMES "sample" CACHE STRING "games to pack into the web distributable (names, all or none)")
+    set(GM_WEB_OUT "${CMAKE_BINARY_DIR}/web" CACHE PATH "web distributable folder")
+    add_custom_target(web_dist ALL
+      COMMAND ${CMAKE_COMMAND} -DGM_BUILD_DIR=${CMAKE_BINARY_DIR} -DGM_WEB_SRC=${CMAKE_CURRENT_SOURCE_DIR}/web
+        -DGM_REPO=${CMAKE_CURRENT_SOURCE_DIR}/.. "-DGM_GAMES=${GM_WEB_GAMES}" -DGM_OUT=${GM_WEB_OUT}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/web/make_dist.cmake
+      DEPENDS gmplay
+      COMMENT "Assembling the web distributable"
+      VERBATIM)
   endif()
 endif()
 

@@ -39,6 +39,7 @@ int  gm_audio_volume(void);
 void gm_audio_set_mute(int on);
 int  gm_audio_muted(void);
 void gm_audio_set_headless(int on);       /* never open an audio device (GM_HEADLESS test mode); GM_WAV still captures */
+void gm_audio_shutdown(void);               /* close the audio device (end of a web page session) */
 
 /* Offline use (tests, tools): drive the mixer from a manual clock and collect samples instead of using a device. */
 void     gm_audio_manual_clock(int on);

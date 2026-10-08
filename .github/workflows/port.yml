@@ -68,9 +68,23 @@ jobs:
           cmake --build build --target fdump --parallel
       - name: WebAssembly build
         run: |
-          emcmake cmake -S port -B build-web -G Ninja -DCMAKE_BUILD_TYPE=Release
-          cmake --build build-web --target gmplay
+          emcmake cmake -S port -B build-node -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-node --target gmplay
       - name: Replay and compare with the DOS tables
         run: |
-          export GM_BUILD_DIR=$PWD/build-web GMPLAY=$PWD/build-web/gmplay-node FDUMP_BIN=$PWD/build/fdump
+          export GM_BUILD_DIR=$PWD/build-node GMPLAY=$PWD/build-node/gmplay-node FDUMP_BIN=$PWD/build/fdump
           sh port/baseline/check_states.sh bcuda houses volume zark donut-gen glub-gen
+
+  # The browser distributable: a static folder (and a .zip of it) to put on any web server.
+  web-dist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mymindstorm/setup-emsdk@v14
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - name: Build and pack (one step)
+        run: bash port/build_web.sh --games sample --out "$PWD/web-dist"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gmplay-web
+          path: web-dist

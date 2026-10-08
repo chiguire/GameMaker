@@ -8,8 +8,8 @@ drawn through [raylib](https://www.raylib.com/). The original engine source is c
 **Windows** and **Linux** (tried on Debian under WSL) and is written to build on **macOS**, which nobody has been able to
 try yet. On Windows and Linux it replays the shipped demo recordings and generated ones **identically to the DOS original**: every tick and
 every video frame match (see [baseline/README.md](baseline/README.md)). Not done: the editors (`gm`, `blocedit`,
-`mapmaker`, ...), which are separate DOS programs that are not part of this port, and a browser page: the engine compiles to WebAssembly and
-replays correctly under Node (see "WebAssembly"), but there is no page to play it in yet.
+`mapmaker`, ...), which are separate DOS programs that are not part of this port, and touch controls. It also runs **in a browser**: `bash port/build_web.sh` builds a folder that any web server can host
+(see "WebAssembly and the browser build").
 
 ## Build and run
 
@@ -26,6 +26,12 @@ Linux and macOS (cmake, a C and C++ compiler, git; on Debian/Ubuntu also
 ```
 sh port/build.sh
 port/build/gmplay houses
+```
+
+Browser (needs the Emscripten SDK; writes a static folder and a .zip):
+
+```
+bash port/build_web.sh                  # see "WebAssembly and the browser build"
 ```
 
 `gmplay` with no game shows the original menu. `gmplay demo.rec game.gam` and the other `playgame` arguments still
@@ -236,37 +242,79 @@ Result on Debian (GCC 14, WSL): all 16 recordings compared with `compare.sh` are
 `check_states.sh` matches the DOS tables for the 12 that have one in the repository, and `platformtest` and `audiotest`
 pass.
 
-### WebAssembly (first step of a browser build)
+### WebAssembly and the browser build
 
-The engine, platform layer, raylib and ymfm also compile to WebAssembly with [Emscripten](https://emscripten.org/), and the
-result replays the recordings **identically to DOS under Node**. There is no browser page yet; this step only proves
-that the code runs correctly as WebAssembly.
+The engine, platform layer, raylib and ymfm also compile to WebAssembly with [Emscripten](https://emscripten.org/). Two
+targets share the code: a **browser** build with its own page (this is what you publish) and a **Node** build that is
+only used to check the WebAssembly code against DOS.
+
+**One step to a web-ready folder** (needs the emsdk, cmake and git; see the top of the script for installing the emsdk):
 
 ```
-emcmake cmake -S port -B build-web -G Ninja -DCMAKE_BUILD_TYPE=Release     # emsdk environment active
-cmake --build build-web --target gmplay                                     # build-web/gmplay.js + gmplay.wasm (about 0.8 MB)
-GM_BUILD_DIR=$PWD/build-web GMPLAY=$PWD/build-web/gmplay-node FDUMP_BIN=<native fdump> \
-  sh port/baseline/check_states.sh bcuda houses ...                        # fdump reads the dumps: build it natively
+bash port/build_web.sh                      # -> port/web-dist/ and port/web-dist.zip, with the Sample game packed in
+bash port/build_web.sh --games houses,donut # or choose the games (names; "all" = every GameMaker 3.0 game; "none")
+bash port/build_web.sh --out /srv/www/gm    # or put it somewhere else
 ```
 
-How it differs from the native builds:
+The folder is a static site: copy it to any web server, no special headers or server software. To try it locally run
+`python3 -m http.server 8000` inside it and open <http://localhost:8000/> (not `file://`: browsers will not load `.wasm`
+from there). `web-dist.zip` is the same folder in one file. It also holds `README.txt`, the licences, and `games.json` +
+`games/*.zip`, the packed games. Underneath, `build_web.sh` is `emcmake cmake ... -DGM_WEB_TARGET=browser` followed by
+`cmake --build <dir> --target web_dist` (`web/make_dist.cmake` does the packing).
+
+**The page** (`web/index.html`, `web/gmplay-web.js`):
+
+- Start page: the packed games as buttons, and a drop zone for **your own game**: drop a folder or a `.zip` (or use the
+  pickers). Files are read in the browser and **never uploaded**. A game with the older file format gets an explanation
+  instead of a crash. Players can bring any game, so you only need to pack what you may publish.
+- The engine runs on the page's canvas; the game's files live in Emscripten's in-memory file system. Scores, saved games and
+  settings (`.his`, `.sav`, `gmplay.ini`) are copied to IndexedDB every two seconds when they change and put back on the next
+  visit.
+- Browsers keep some keys, so the page has buttons: full screen (which also takes the Esc key for the game where the
+  browser allows it, Chrome and Edge), picture mode, volume, mute, and a key list. Alt+Enter, Alt+Up/Down and Alt+M work as
+  in the desktop player; F11 and F12 belong to the browser.
+- URL parameters: `?game=sample` marks a packed game, `&scale=fit43`, `&volume=50`, `&mute=1`.
+- Needs WebAssembly and (for zip files) `DecompressionStream`: current Chrome, Edge, Firefox and Safari. No touch controls yet.
+
+How the code differs from the native builds:
 
 - **Asyncify.** A browser cannot run a loop that never returns, and every wait in the engine is such a loop. They all call
   `gm_pump()`, so that function (at most every 4 ms) and `gm_os_sleep_ms()` call `emscripten_sleep()`, which unwinds the
-  WebAssembly stack, lets the browser (or Node) run and resumes. Nothing in the engine itself changed for this.
+  WebAssembly stack, lets the browser run and resumes. Nothing in the engine itself changed for this.
+- **The page starts the engine** (`-sINVOKE_RUN=0`) once a game's files are in place, from the click that chose the game,
+  which is also what lets the browser start the audio. Buttons talk to the engine through `gm_web_command()`; the commands
+  are queued and applied inside `gm_pump()`, so nothing runs while the page calls in. Full screen goes the other way:
+  `fb_set_fullscreen()` calls the page, which asks the browser and reports back.
 - **Function pointers must match their type exactly.** Native code tolerates calling a function through a pointer of
   another type; WebAssembly traps ("function signature mismatch"). The interrupt handlers were declared `(...)` and
   called as `void(*)()`; in the port they are declared `(void)` through the `ISRARGS` macro in `PLAYGAME.C` (Borland's
   `setvect()` insists on `(...)`, so the DOS build keeps that; the first attempt at changing it for both broke the DOS build).
 - **Clang is stricter than GCC** (it is what Emscripten and macOS use): redundant `Box2d::` qualifiers inside class bodies
   were removed, and `strupr`/`strlwr` are not defined where the libc has them. Both help the macOS build too.
-- `long` is 32 bits in WebAssembly, as in Borland; the pthread and signal diagnostics are left out.
-- The Node target (`-DGM_WEB_TARGET=node`, the default) reads real files (`-sNODERAWFS`) and takes its environment
-  variables from the process (`src/web_node_env.js`) so that `GM_HEADLESS`, `FDUMP` and the others work. A browser target
-  needs a virtual file system, a page, audio unlock, and so on; see "Next".
+- `long` is 32 bits in WebAssembly, as in Borland; the pthread and signal diagnostics are left out. raylib's WebAudio code
+  needs the heap views exported (`HEAPF32` and friends), or the page aborts the moment audio starts.
+
+**Checking the WebAssembly code against DOS** uses the Node target (`-DGM_WEB_TARGET=node`, the default of a plain
+`emcmake cmake`), which reads real files and takes its environment from the process, so `GM_HEADLESS`, `FDUMP` and the
+others work:
+
+```
+emcmake cmake -S port -B build-node -G Ninja -DCMAKE_BUILD_TYPE=Release     # emsdk environment active
+cmake --build build-node --target gmplay                                    # gmplay.js, gmplay.wasm, gmplay-node
+GM_BUILD_DIR=$PWD/build-node GMPLAY=$PWD/build-node/gmplay-node FDUMP_BIN=<native fdump> \
+  sh port/baseline/check_states.sh bcuda houses ...                        # fdump reads the dumps: build it natively
+```
 
 Result: `check_states.sh` matches the DOS tables for all 12 recordings that have one under Node, and `compare.sh` (ticks and
 every pixel) for the games listed in baseline/README.md.
+
+**What was tried in a browser.** Chrome 154 (headless, driven over the DevTools protocol) loaded the page, started the Sample
+game from the page's button and from a picked `.zip`, got through the title into gameplay with real key events, and
+changed volume and picture mode through the page's commands (settings came back after a reload). It refused an
+older-format game with the explanation, a file written by the game was restored after a reload, and leaving the game
+through its own Quit menu ended on the page's "Thanks for playing" screen without errors. **Not tried:** audio
+that someone listens to, the gamepad, real full screen with the Esc lock (headless Chrome cannot do those), other browsers,
+phones.
 
 ### Damaged game data
 
@@ -319,8 +367,8 @@ Still open:
 - The gamepad code has never run with a gamepad connected (there was none), and the full-screen, scaling, volume and mute
   actions were run through `GM_HOST_KEYS`, not with real key presses. Nobody has listened to the sound either (levels and
   drum voices are unchanged from the earlier analysis).
-- A browser build: the WebAssembly part works (see "WebAssembly"). Still to do: a page with a canvas and a "click to
-  start" overlay for audio, a virtual file system with games dropped onto the page or fetched on demand, saves and settings
-  in IndexedDB, replacements for the keys browsers keep (F11, F12, Esc in full screen), and a CI job that deploys it.
+- The browser build works in headless Chrome only (see "WebAssembly and the browser build"). Still to do: try it in real
+  browsers with real audio, full screen and gamepads; touch controls for phones; a deploy job (the CI workflow builds the
+  folder and attaches it to the run, but publishes nothing).
 - The editors (`gm`, `blocedit`, `charedit`, `mapmaker`, ...); they still run in DOSBox.
 - 14 shareware games in `cd/sharware` use an older format that this player rejects, as the DOS one does.

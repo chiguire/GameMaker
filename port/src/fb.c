@@ -5,6 +5,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 
 uint8_t fb_pix[FB_W * FB_H];
 FbColor fb_pal[256];
@@ -55,7 +58,9 @@ void fb_open(const char *title, int scale)
     SetExitKey(KEY_NULL);               /* Esc belongs to the game; closing the window is the way out of the program */
     SetTargetFPS(60);
     make_texture(FB_W, FB_H);
+#ifndef __EMSCRIPTEN__                 /* a browser only allows full screen from a click, so the page does it */
     if (gm_settings.fullscreen) fb_set_fullscreen(1);
+#endif
 }
 
 void fb_close(void)
@@ -91,6 +96,13 @@ void fb_set_fullscreen(int on)
 {
     on = on != 0;
     if (on == fullscreen) return;
+#ifdef __EMSCRIPTEN__
+    /* The page owns full screen (it needs a user gesture, and also locks the Esc key while full screen) and reports back
+     * through gm_web_command(); until it does, assume the request works. */
+    emscripten_run_script(on ? "window.gmSetFullscreen && window.gmSetFullscreen(true)" : "window.gmSetFullscreen && window.gmSetFullscreen(false)");
+    fullscreen = on;
+    return;
+#endif
     if (on) {                           /* remember the window so that leaving full screen restores it */
         Vector2 p = GetWindowPosition();
         saved_x = (int)p.x; saved_y = (int)p.y; saved_w = GetScreenWidth(); saved_h = GetScreenHeight();
@@ -103,6 +115,7 @@ void fb_set_fullscreen(int on)
 }
 
 int fb_is_fullscreen(void) { return fullscreen; }
+void fb_note_fullscreen(int on) { fullscreen = on != 0; }     /* the browser changed it (Esc, its own button) */
 
 void fb_toast(const char *fmt, ...)
 {

@@ -553,11 +553,61 @@ static void fire_timer(void)
     if (now >= next_tick) next_tick = now + period;
 }
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+/* Commands from the web page, which has buttons for what a browser keeps from the keyboard (F11, F12, Alt chords).
+ * They are queued here and applied from gm_pump(), so that nothing in the engine runs while the page calls in.
+ *   1 volume 0..100   2 toggle mute   3 next picture mode   4 picture mode = arg   5 the browser's full-screen state = arg */
+enum { WEB_Q = 16 };
+static volatile int web_q_cmd[WEB_Q], web_q_arg[WEB_Q];
+static volatile unsigned web_q_head, web_q_tail;
+
+EMSCRIPTEN_KEEPALIVE void gm_web_command(int cmd, int arg)
+{
+    unsigned h = web_q_head;
+    if (h - web_q_tail >= WEB_Q) return;
+    web_q_cmd[h % WEB_Q] = cmd;
+    web_q_arg[h % WEB_Q] = arg;
+    web_q_head = h + 1;
+}
+
+static void web_apply(void)
+{
+    while (web_q_tail != web_q_head) {
+        int c = web_q_cmd[web_q_tail % WEB_Q], a = web_q_arg[web_q_tail % WEB_Q];
+        web_q_tail++;
+        switch (c) {
+        case 1:
+            gm_settings.volume = a < 0 ? 0 : (a > 100 ? 100 : a);
+            gm_settings.mute = 0;
+            gm_audio_set_volume(gm_settings.volume);
+            gm_audio_set_mute(0);
+            fb_toast("Volume %d%%", gm_settings.volume);
+            break;
+        case 2: act_mute(); break;
+        case 3: act_scale(); break;
+        case 4:
+            if (a >= 0 && a < GM_SCALE_COUNT) gm_settings.scale_mode = a;
+            break;
+        case 5:
+            fb_note_fullscreen(a);
+            gm_settings.fullscreen = a != 0;
+            break;
+        default: continue;
+        }
+        gm_settings_save();
+    }
+}
+#endif
+
 void gm_pump(void)
 {
     gm_heartbeat++;
     if (in_isr) return;
     ensure_window();
+#ifdef __EMSCRIPTEN__
+    web_apply();
+#endif
     if (!headless && WindowShouldClose()) { fb_close(); exit(0); }
     if (gm_os_time() - last_present >= 1.0 / 60.0) present();
     poll_keys();
