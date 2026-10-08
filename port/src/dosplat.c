@@ -564,6 +564,14 @@ void gm_pump(void)
     type_keys();
     gm_audio_pump();
     fire_timer();
+#ifdef __EMSCRIPTEN__
+    /* Every wait in the engine ends up here, which makes this the one place to give the browser a turn (to draw the
+     * frame, deliver key and gamepad events and refill the audio buffer). Often enough for that, rarely enough that
+     * Asyncify's unwinding does not dominate. */
+    static double last_yield;
+    double t = gm_os_time();
+    if (t - last_yield >= 0.004) { last_yield = t; gm_os_yield(); }
+#endif
 }
 
 /* ---------------------------------------------------------------------------------------------

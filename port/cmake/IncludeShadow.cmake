@@ -63,6 +63,7 @@ endfunction()
 #
 #   gm_mirror_dir(<source dir> <destination dir>)
 function(gm_mirror_dir src dst)
+  file(REMOVE_RECURSE "${dst}")                 # no leftovers from files that were renamed or re-cased
   file(MAKE_DIRECTORY "${dst}")
   string(ASCII 26 ctrlz)
   file(GLOB entries LIST_DIRECTORIES false "${src}/*")

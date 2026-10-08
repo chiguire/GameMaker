@@ -92,9 +92,9 @@ class Box2d
   Box2d(int x,int y,int x1,int y1) { Set(x,y,x1,y1); }
   Box2d(Coord2d ull,Coord2d lrr)   { Set(ull,lrr); }
   Box2d() {}
-  void Box2d::Set(Coord2d ull,Coord2d lrr)
+  void Set(Coord2d ull,Coord2d lrr)
     { ul=ull; lr=lrr; }
-  void Box2d::Set(int x,int y,int x1,int y1)
+  void Set(int x,int y,int x1,int y1)
     { ul.x=x,ul.y=y; lr.x=x1; lr.y=y1; }
   boolean In(Box2d b)  // is one box inside another?
     { return ( (boolean) (ul.In(b)&&lr.In(b)) ); }

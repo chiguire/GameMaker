@@ -19,6 +19,7 @@ double gm_os_time(void)
 }
 
 void gm_os_sleep_ms(unsigned ms) { Sleep(ms); }
+void gm_os_yield(void) {}
 
 static void fill_ffblk(struct ffblk *f, const WIN32_FIND_DATAA *d)
 {
@@ -82,11 +83,19 @@ double gm_os_time(void)
     return (double)(t.tv_sec - t0.tv_sec) + (double)(t.tv_nsec - t0.tv_nsec) / 1e9;
 }
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+/* In a browser the page can only run while this code is parked: emscripten_sleep() hands control back (Asyncify). */
+void gm_os_sleep_ms(unsigned ms) { emscripten_sleep(ms); }
+void gm_os_yield(void) { emscripten_sleep(0); }
+#else
 void gm_os_sleep_ms(unsigned ms)
 {
     struct timespec d = { ms / 1000, (long)(ms % 1000) * 1000000L };
     nanosleep(&d, NULL);
 }
+void gm_os_yield(void) {}
+#endif
 
 /* POSIX: list a directory and match the DOS wildcard pattern ("*", "?", case-insensitive) ourselves.
  * Only names that fit 8.3 are reported, because that is all DOS (and the engine's 14-byte name slots) can hold. */

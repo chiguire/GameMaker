@@ -8,7 +8,8 @@ drawn through [raylib](https://www.raylib.com/). The original engine source is c
 **Windows** and **Linux** (tried on Debian under WSL) and is written to build on **macOS**, which nobody has been able to
 try yet. On Windows and Linux it replays the shipped demo recordings and generated ones **identically to the DOS original**: every tick and
 every video frame match (see [baseline/README.md](baseline/README.md)). Not done: the editors (`gm`, `blocedit`,
-`mapmaker`, ...), which are separate DOS programs that are not part of this port, and a web build.
+`mapmaker`, ...), which are separate DOS programs that are not part of this port, and a browser page: the engine compiles to WebAssembly and
+replays correctly under Node (see "WebAssembly"), but there is no page to play it in yet.
 
 ## Build and run
 
@@ -235,6 +236,38 @@ Result on Debian (GCC 14, WSL): all 16 recordings compared with `compare.sh` are
 `check_states.sh` matches the DOS tables for the 12 that have one in the repository, and `platformtest` and `audiotest`
 pass.
 
+### WebAssembly (first step of a browser build)
+
+The engine, platform layer, raylib and ymfm also compile to WebAssembly with [Emscripten](https://emscripten.org/), and the
+result replays the recordings **identically to DOS under Node**. There is no browser page yet; this step only proves
+that the code runs correctly as WebAssembly.
+
+```
+emcmake cmake -S port -B build-web -G Ninja -DCMAKE_BUILD_TYPE=Release     # emsdk environment active
+cmake --build build-web --target gmplay                                     # build-web/gmplay.js + gmplay.wasm (about 0.8 MB)
+GM_BUILD_DIR=$PWD/build-web GMPLAY=$PWD/build-web/gmplay-node FDUMP_BIN=<native fdump> \
+  sh port/baseline/check_states.sh bcuda houses ...                        # fdump reads the dumps: build it natively
+```
+
+How it differs from the native builds:
+
+- **Asyncify.** A browser cannot run a loop that never returns, and every wait in the engine is such a loop. They all call
+  `gm_pump()`, so that function (at most every 4 ms) and `gm_os_sleep_ms()` call `emscripten_sleep()`, which unwinds the
+  WebAssembly stack, lets the browser (or Node) run and resumes. Nothing in the engine itself changed for this.
+- **Function pointers must match their type exactly.** Native code tolerates calling a function through a pointer of
+  another type; WebAssembly traps ("function signature mismatch"). The interrupt handlers were declared `(...)` and
+  called as `void(*)()`; in the port they are declared `(void)` through the `ISRARGS` macro in `PLAYGAME.C` (Borland's
+  `setvect()` insists on `(...)`, so the DOS build keeps that; the first attempt at changing it for both broke the DOS build).
+- **Clang is stricter than GCC** (it is what Emscripten and macOS use): redundant `Box2d::` qualifiers inside class bodies
+  were removed, and `strupr`/`strlwr` are not defined where the libc has them. Both help the macOS build too.
+- `long` is 32 bits in WebAssembly, as in Borland; the pthread and signal diagnostics are left out.
+- The Node target (`-DGM_WEB_TARGET=node`, the default) reads real files (`-sNODERAWFS`) and takes its environment
+  variables from the process (`src/web_node_env.js`) so that `GM_HEADLESS`, `FDUMP` and the others work. A browser target
+  needs a virtual file system, a page, audio unlock, and so on; see "Next".
+
+Result: `check_states.sh` matches the DOS tables for all 12 recordings that have one under Node, and `compare.sh` (ticks and
+every pixel) for the games listed in baseline/README.md.
+
 ### Damaged game data
 
 - `datacheck.ps1` validates the data files (GIF and VOC structure, FLI and CMF lengths, and the sizes of the fixed-size
@@ -286,6 +319,8 @@ Still open:
 - The gamepad code has never run with a gamepad connected (there was none), and the full-screen, scaling, volume and mute
   actions were run through `GM_HOST_KEYS`, not with real key presses. Nobody has listened to the sound either (levels and
   drum voices are unchanged from the earlier analysis).
-- A web build (emscripten) needs the engine's blocking loops turned inside out; not attempted.
+- A browser build: the WebAssembly part works (see "WebAssembly"). Still to do: a page with a canvas and a "click to
+  start" overlay for audio, a virtual file system with games dropped onto the page or fetched on demand, saves and settings
+  in IndexedDB, replacements for the keys browsers keep (F11, F12, Esc in full screen), and a CI job that deploys it.
 - The editors (`gm`, `blocedit`, `charedit`, `mapmaker`, ...); they still run in DOSBox.
 - 14 shareware games in `cd/sharware` use an older format that this player rejects, as the DOS one does.

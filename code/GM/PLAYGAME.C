@@ -362,8 +362,13 @@ volatile uchar         curkey   = 0;
 int                    oldscene = 0;  // Scene 0 is the startup scene
 int                    curscene = 0;
 int                    doscene,prevscene,linkin;
-static void interrupt  (*OldKbd) (...);
-static void interrupt  (*OldTimer)(...);
+#ifdef GM_PORT
+  #define ISRARGS void   // WebAssembly needs a function pointer's type to match the function exactly: no varargs
+#else
+  #define ISRARGS ...    // Borland's setvect() wants interrupt handlers declared with (...)
+#endif
+static void interrupt  (*OldKbd) (ISRARGS);
+static void interrupt  (*OldTimer)(ISRARGS);
 
 static char            gamename [MAXFILENAMELEN];
 static char            TempFname[MAXFILENAMELEN];
@@ -415,9 +420,9 @@ static unsigned int chkrights (touchblk *t);
 static unsigned int chklefts  (touchblk *t);
 
 static void StealKbd(void);
-extern "C" void interrupt NewMicroKbd(...);
-extern "C" void interrupt NewATKbd   (...);
-static void interrupt NewTimer       (...); // Advances timer every clock tick.
+extern "C" void interrupt NewMicroKbd(ISRARGS);
+extern "C" void interrupt NewATKbd   (ISRARGS);
+static void interrupt NewTimer       (ISRARGS); // Advances timer every clock tick.
 static void PopKey       (uchar key);
 static void PushKey      (void);
 static void CleanKeyStk  (void);
@@ -4589,7 +4594,7 @@ static char HandleJStick(int fn)
   return(retval);
   }
 
-static void interrupt NewTimer(...)
+static void interrupt NewTimer(ISRARGS)
   {
 #ifdef FRAMEDUMP
   if (DetClock)

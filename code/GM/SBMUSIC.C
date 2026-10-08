@@ -24,7 +24,7 @@ void PlayIt(void);                                 //play song
 void ResetFM(void);                                //Reset the FM chip
 
 static gm_long offset = 0;        // Variables for use in PlayIt()
-static gm_ulong wait = 0;
+static gm_ulong music_wait = 0;
 static unsigned char far *sbmusic=NULL;
 static char far *inst=NULL;
 
@@ -137,9 +137,9 @@ void PlayIt(void)                  // This function should:
   static char channel = 0;         //   location specified by *sbmusic and
   static char funct = 8;           //   all resulting commands.
                                    //  Be called on every clock tick!
-  if (offset==0) {wait =1; getpaws();} // Skip beginning silence.
-  wait--;
-  while (wait==0)
+  if (offset==0) {music_wait =1; getpaws();} // Skip beginning silence.
+  music_wait--;
+  while (music_wait==0)
     {
     switch ((*(APOS))&0xF0)
       {
@@ -200,7 +200,7 @@ void PlayIt(void)                  // This function should:
                                            // maybe I should reset and reload.
       default: sbfd_reset(); offset=0;     //This should never occur!
       }
-    wait = getpaws();
+    music_wait = getpaws();
     }
   }
 

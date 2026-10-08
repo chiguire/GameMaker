@@ -50,3 +50,27 @@ jobs:
         run: |
           export GM_BUILD_DIR=$PWD/build
           sh port/baseline/check_states.sh bcuda houses volume zark donut-gen glub-gen
+
+  # The same engine compiled to WebAssembly with Emscripten, run under Node: replays the recordings and compares the
+  # frame tables with the DOS ones, so the web build is checked the way the native ones are. (No browser page yet.)
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mymindstorm/setup-emsdk@v14
+      - name: Packages (the native fdump tool needs raylib's desktop headers)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libgl-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libasound2-dev
+      - name: Native fdump (reads the frame dumps)
+        run: |
+          cmake -S port -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target fdump --parallel
+      - name: WebAssembly build
+        run: |
+          emcmake cmake -S port -B build-web -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-web --target gmplay
+      - name: Replay and compare with the DOS tables
+        run: |
+          export GM_BUILD_DIR=$PWD/build-web GMPLAY=$PWD/build-web/gmplay-node FDUMP_BIN=$PWD/build/fdump
+          sh port/baseline/check_states.sh bcuda houses volume zark donut-gen glub-gen

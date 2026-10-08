@@ -8,6 +8,9 @@ if(MSVC)
 endif()
 
 include(FetchContent)
+if(EMSCRIPTEN)
+  set(PLATFORM Web CACHE STRING "raylib platform" FORCE)   # WebGL canvas instead of a desktop window
+endif()
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(raylib
   GIT_REPOSITORY https://github.com/raysan5/raylib.git
@@ -32,12 +35,21 @@ set_target_properties(gmplat PROPERTIES CXX_STANDARD 17)
 target_include_directories(gmplat PUBLIC src)
 target_link_libraries(gmplat PUBLIC raylib)
 
-add_executable(gmview src/gmview.c)
-target_link_libraries(gmview PRIVATE gmplat)
+# The web build (Emscripten) is just gmplay; the viewers, converters and self-tests are built natively.
+if(EMSCRIPTEN)
+  set(GM_DESKTOP_TOOLS OFF)
+else()
+  set(GM_DESKTOP_TOOLS ON)
+endif()
 
-# Reader/comparer for frame dumps from the instrumented DOS playgame.
-add_executable(fdump tools/fdump.c)
-target_link_libraries(fdump PRIVATE raylib)
+if(GM_DESKTOP_TOOLS)
+  add_executable(gmview src/gmview.c)
+  target_link_libraries(gmview PRIVATE gmplat)
+
+  # Reader/comparer for frame dumps from the instrumented DOS playgame.
+  add_executable(fdump tools/fdump.c)
+  target_link_libraries(fdump PRIVATE raylib)
+endif()
 
 # ---------------------------------------------------------------------------------------------
 # The original GameMaker engine (code/), compiled in place as C++ behind shim/gmcompat.h
@@ -111,7 +123,7 @@ target_sources(gmplat PRIVATE src/dosplat.c src/dosfind.c)
 add_executable(gmplay src/gmplay_main.cpp $<TARGET_OBJECTS:engine_objs>)
 set_target_properties(gmplay PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 target_link_libraries(gmplay PRIVATE gmplat)
-if(NOT WIN32)
+if(NOT WIN32 AND NOT EMSCRIPTEN)
   find_package(Threads REQUIRED)                  # the hang watchdog (GM_WATCHDOG) runs on its own thread
   target_link_libraries(gmplay PRIVATE Threads::Threads ${CMAKE_DL_LIBS} m)
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -119,6 +131,24 @@ if(NOT WIN32)
   endif()
 endif()
 
+if(EMSCRIPTEN)
+  # Every wait in the engine is a loop that calls gm_pump(); Asyncify lets that code park itself so that the browser
+  # (or Node) can run in between (see gm_os_yield in src/dosfind.c).
+  #   GM_WEB_TARGET=node     runs under Node with the real file system: used to replay recordings and compare with DOS
+  #   GM_WEB_TARGET=browser  (not built yet)
+  set(GM_WEB_TARGET "node" CACHE STRING "node or browser")
+  set_target_properties(gmplay PROPERTIES SUFFIX ".js")
+  target_link_options(gmplay PRIVATE -sASYNCIFY=1 -sASYNCIFY_STACK_SIZE=524288 -sSTACK_SIZE=2097152
+    -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=33554432 -sEXIT_RUNTIME=1 -sUSE_GLFW=3 -sASSERTIONS=1)
+  if(GM_WEB_TARGET STREQUAL "node")
+    target_link_options(gmplay PRIVATE -sENVIRONMENT=node -sNODERAWFS=1 --pre-js ${CMAKE_CURRENT_SOURCE_DIR}/src/web_node_env.js)
+    # <build dir>/gmplay-node runs it like a native program (baseline/check_states.sh: GMPLAY=<build dir>/gmplay-node)
+    file(WRITE ${CMAKE_BINARY_DIR}/gmplay-node "#!/bin/sh\nexec node \"${CMAKE_BINARY_DIR}/gmplay.js\" \"$@\"\n")
+    file(CHMOD ${CMAKE_BINARY_DIR}/gmplay-node PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+  endif()
+endif()
+
+if(GM_DESKTOP_TOOLS)
 # Timeline of a captured WAV (GM_WAV=...), to check audio output without listening.
 add_executable(wavstat tools/wavstat.c)
 if(NOT MSVC)
@@ -146,3 +176,5 @@ target_link_libraries(audiotest PRIVATE gmplat)
 # DOS-style file names, directory listing, volume). Run it in a scratch folder: it writes ./pt_work.
 add_executable(platformtest tools/platformtest.c)
 target_link_libraries(platformtest PRIVATE gmplat)
+
+endif()  # GM_DESKTOP_TOOLS

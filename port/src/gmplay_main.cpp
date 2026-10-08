@@ -99,7 +99,7 @@ static DWORD WINAPI watchdog(LPVOID)
         ExitProcess(3);
     }
 }
-#else
+#elif !defined(__EMSCRIPTEN__)
 // POSIX diagnostics, same idea as above: a crash reporter, a hang watchdog and an exit tracer, printing call stacks
 // with backtrace() (function names need the executable to export its symbols; CMake adds -rdynamic on Linux).
 #include <signal.h>
@@ -325,7 +325,7 @@ int main(int argc, char *argv[])
     if (getenv("GM_EXITTRACE")) atexit(trace_exit);
     DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(), &main_thread, 0, FALSE, DUPLICATE_SAME_ACCESS);
     if (getenv("GM_WATCHDOG")) CreateThread(NULL, 0, watchdog, NULL, 0, NULL);
-#else
+#elif !defined(__EMSCRIPTEN__)
     for (int sig : { SIGSEGV, SIGBUS, SIGFPE, SIGILL, SIGABRT }) signal(sig, crash_handler);
     if (getenv("GM_EXITTRACE")) atexit(trace_exit);
     if (getenv("GM_WATCHDOG")) {

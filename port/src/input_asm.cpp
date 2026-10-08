@@ -52,8 +52,8 @@ static void KeyInt(int microchannel)
   outportb(0x20, 0x20);                         // end of interrupt
   }
 
-extern "C" void interrupt NewATKbd(...)    { KeyInt(0); }
-extern "C" void interrupt NewMicroKbd(...) { KeyInt(1); }
+extern "C" void interrupt NewATKbd(void)    { KeyInt(0); }
+extern "C" void interrupt NewMicroKbd(void) { KeyInt(1); }
 
 extern "C" char KeyBoardOff(void)
   {

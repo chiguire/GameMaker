@@ -102,7 +102,7 @@ typedef uint32_t gm_ulong;
 #define outportb(p, v) gm_outportb((uint16_t)(p), (uint8_t)(v))
 #define inport(p) gm_inport((uint16_t)(p))
 #define outport(p, v) gm_outport((uint16_t)(p), (uint16_t)(v))
-#define getvect(n) ((void (*)(...))gm_getvect((int16_t)(n)))
+#define getvect(n) ((void (*)(void))gm_getvect((int16_t)(n)))
 #define setvect(n, h) gm_setvect((int16_t)(n), (gm_isr)(h))
 #define enable() gm_int_enable()
 #define disable() gm_int_disable()
@@ -141,8 +141,10 @@ static inline void gotoxy(int x, int y) { (void)x; (void)y; }  /* text-mode curs
 #define stricmp   strcasecmp
 #define strncmpi  strncasecmp
 #define strnicmp  strncasecmp
+#ifndef __EMSCRIPTEN__                      /* Emscripten's libc already has them */
 static inline char *strupr(char *s) { for (char *p = s; *p; p++) *p = (char)toupper((unsigned char)*p); return s; }
 static inline char *strlwr(char *s) { for (char *p = s; *p; p++) *p = (char)tolower((unsigned char)*p); return s; }
+#endif
 #endif
 #ifndef _WIN32
 /* DOS file names on a case-sensitive file system with "/" separators: see dospath.c */
