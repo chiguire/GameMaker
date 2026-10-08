@@ -82,33 +82,37 @@ static struct VgaScrnInit
   {
   VgaScrnInit()
     {
-    VGAScrn.Size.Set(320, 200);
-    VGAScrn.LineSep = 320;
-    VGAScrn.ColDepth = 8;
-    VGAScrn.Address = (Pixel *)MK_FP(0xA000, 0);
-    VGAScrn.ViewPageOff = 0;
-    VGAScrn.BIOSMode = 0x13;
-    VGAScrn.SetMode = SetModeL256;
-    VGAScrn.Clear = ClearL256;
-    VGAScrn.Point = PointL256;
-    VGAScrn.GetCol = GetColL256;
-    VGAScrn.Rep1Col = Rep1ColL256;
-    VGAScrn.Rep1ColRev = 0;
-    VGAScrn.RepCols = RepColsL256;
-    VGAScrn.RepColsRev = 0;
-    VGAScrn.GetCols = GetColsL256;
-    VGAScrn.GetColsRev = 0;
-    VGAScrn.Line = DummyLine;
-    VGAScrn.Box = DummyLine;
-    VGAScrn.BoxFill = BoxFillL256;
-    VGAScrn.DrawBlock = DummyBlock;
-    VGAScrn.BCurve = DummyBCurve;
-    VGAScrn.Spline = DummyBCurve;
-    VGAScrn.SetViewPos = DummyViewPos;
-    VGAScrn.SetWritePage = DummyViewPos;
-    VGAScrn.SetAllPal = SetAllPalL;
-    VGAScrn.GetAllPal = GetAllPalL;
-    VGAScrn.SetAllPalTo = SetAllPalToL;
-    VGAScrn.SetPal = SetPalL;
+    // Written through a volatile pointer so the optimizer cannot fold these stores into static data
+    // (relocations at unaligned offsets of the packed struct, which the macOS linker rejects).
+    VideoMode *volatile pv = &VGAScrn;
+    VideoMode *V = pv;
+    V->Size.Set(320, 200);
+    V->LineSep = 320;
+    V->ColDepth = 8;
+    V->Address = (Pixel *)MK_FP(0xA000, 0);
+    V->ViewPageOff = 0;
+    V->BIOSMode = 0x13;
+    V->SetMode = SetModeL256;
+    V->Clear = ClearL256;
+    V->Point = PointL256;
+    V->GetCol = GetColL256;
+    V->Rep1Col = Rep1ColL256;
+    V->Rep1ColRev = 0;
+    V->RepCols = RepColsL256;
+    V->RepColsRev = 0;
+    V->GetCols = GetColsL256;
+    V->GetColsRev = 0;
+    V->Line = DummyLine;
+    V->Box = DummyLine;
+    V->BoxFill = BoxFillL256;
+    V->DrawBlock = DummyBlock;
+    V->BCurve = DummyBCurve;
+    V->Spline = DummyBCurve;
+    V->SetViewPos = DummyViewPos;
+    V->SetWritePage = DummyViewPos;
+    V->SetAllPal = SetAllPalL;
+    V->GetAllPal = GetAllPalL;
+    V->SetAllPalTo = SetAllPalToL;
+    V->SetPal = SetPalL;
     }
   } vga_scrn_init;
