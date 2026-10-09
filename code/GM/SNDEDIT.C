@@ -56,8 +56,12 @@ static void Drawmarks(int i);
 static void initallData(void);
 static void playb(int x,int y, unsigned char col[4]);
 static void nextb(int x,int y, unsigned char col[4]);
+#ifndef GM_PORT
 static void helpb(int x,int y,unsigned char *col);
+#endif
+#ifndef GM_PORT
 static void menub(int x,int y,unsigned char *col);
+#endif
 static void prevb(int x,int y, unsigned char col[4]);
 static void cleanup(void);
 static void convcmf(void);
@@ -581,19 +585,19 @@ static int fputvarlen(gm_ulong value,FILE *fp)
 
 static void playb(int x,int y, unsigned char col[4])
   {
-  char playar[] = "         UUUUUUU@UUUUUUUTUýuW×WUTUU×u]wWUUUUýu_õýUUUUÕu]uuUU•UÕÝuuUVUUUUUUUT)UUUUUUUhªªªªªªª€";
+  char playar[] = "\000\000\000\000\000\000\000\000\000UUUUUUU@UUUUUUUTUýuW×WUTUU×u]wWUUUUýu_õýUUUUÕu]uuUU•UÕÝuuUVUUUUUUUT)UUUUUUUhªªªªªªª€";
   draw4dat(x,y,playar,35,10,col);
   }
 
 static void prevb(int x,int y, unsigned char col[4])
   {
-  char prevar[] = "         UUUUUUU@UUUUUUUTUý_÷WUTUU×uÝWWUUUUý_×WUUUUÕuÝUÝUU•UÕußõuUVUUUUUUUT)UUUUUUUhªªªªªªª€";
+  char prevar[] = "\000\000\000\000\000\000\000\000\000UUUUUUU@UUUUUUUTUý_÷WUTUU×uÝWWUUUUý_×WUUUUÕuÝUÝUU•UÕußõuUVUUUUUUUT)UUUUUUUhªªªªªªª€";
   draw4dat(x,y,prevar,35,10,col);
   }
 
 static void nextb(int x,int y, unsigned char col[4])
   {
-  char nextar[] = "         UUUUUUU@UUUUUUUTU×ÝwÿUTUU÷u]uuUUUUÿWÕuUUUUßu]uuUU•U×ÝuuUVUUUUUUUT)UUUUUUUhªªªªªªª€";
+  char nextar[] = "\000\000\000\000\000\000\000\000\000UUUUUUU@UUUUUUUTU×ÝwÿUTUU÷u]uuUUUUÿWÕuUUUUßu]uuUU•U×ÝuuUVUUUUUUUT)UUUUUUUhªªªªªªª€";
   draw4dat(x,y,nextar,35,10,col);
   }
 

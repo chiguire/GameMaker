@@ -91,6 +91,8 @@ else()
       -fpermissive                        # GCC: old-style conversions are warnings
       -fno-strict-aliasing                # the sources pun types
       -fno-delete-null-pointer-checks
+      -Wno-c++11-narrowing                # Clang: char tables like {128, 160, ...} (the editors' button pictures)
+      -Wno-narrowing                      # GCC: the same
       -fno-operator-names)                # "xor" is a function name in the sources
     string(MAKE_C_IDENTIFIER "GM_HAS${flag}" var)
     check_cxx_compiler_flag(${flag} ${var})
@@ -132,7 +134,7 @@ if(NOT WIN32 AND NOT EMSCRIPTEN)
 endif()
 
 option(GM_EDITORS "build the design tools (menu, utility, palchos, ...)" ON)
-if(GM_EDITORS AND NOT EMSCRIPTEN)     # the web build of the editors comes later (EDITORS_PLAN.md, phase 1)
+if(GM_EDITORS)
   include(cmake/Editors.cmake)
 endif()
 

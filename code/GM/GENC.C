@@ -52,6 +52,32 @@ class ConfigData
 
 static ConfigData Cfg;
 
+#ifdef GM_PORT
+// The web build runs this program after the page has put the data folder in place, which is after the constructor below
+// (a static object) has looked for gm.cfg, and nothing runs ~ConfigData there: the platform calls these two.
+extern "C" void gm_reload_config(void)
+  {
+  FILE *fp;
+  if ((fp=fopen("gm.cfg","rb"))!=NULL)
+    {
+    Cfg.Read(fp);
+    fclose(fp);
+    strcpy(WorkDir,Cfg.WorkingDirectory);
+    }
+  }
+
+extern "C" void gm_save_config(void)
+  {
+  FILE *fp;
+  if ((fp=fopen("gm.cfg","wb"))!=NULL)
+    {
+    strcpy(Cfg.WorkingDirectory,WorkDir);
+    Cfg.Write(fp);
+    fclose(fp);
+    }
+  }
+#endif
+
 ConfigData::ConfigData()
   {
   FILE *fp;

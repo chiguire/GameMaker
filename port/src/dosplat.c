@@ -620,6 +620,7 @@ static void web_apply(void)
 }
 #endif
 
+static void kev_poll(void);                 /* GM_KEYSCRIPT events that are not keys (mouse, dump, quit): defined with the BIOS keyboard below */
 static void (*pump_hook)(void);
 void gm_set_pump_hook(void (*hook)(void)) { pump_hook = hook; }
 
@@ -635,6 +636,7 @@ void gm_pump(void)
     if (gm_os_time() - last_present >= 1.0 / 60.0) present();
     poll_keys();
     type_keys();
+    kev_poll();
     gm_audio_pump();
     fire_timer();
     if (pump_hook) { in_isr++; pump_hook(); in_isr--; }
@@ -653,11 +655,11 @@ void gm_pump(void)
  * ------------------------------------------------------------------------------------------- */
 void gm_mouse_show(int16_t on) { mouse_shown = on; }
 
-static int32_t headless_mx, headless_my;     /* headless: the pointer stays where the engine last put it, like a still mouse */
+static int32_t headless_mx, headless_my, headless_buttons;     /* headless: the pointer stays where the engine last put it, like a still mouse */
 
 void gm_mouse_get(int32_t *vx, int32_t *vy, int32_t *buttons)
 {
-    if (headless) { *vx = headless_mx; *vy = headless_my; *buttons = 0; return; }
+    if (headless) { *vx = headless_mx; *vy = headless_my; *buttons = headless_buttons; return; }
     if (!window_open) { *vx = *vy = *buttons = 0; return; }
     Vector2 p = GetMousePosition();
     float s = (float)GetRenderWidth() / (float)GetScreenWidth();   /* DPI scale: render px per logical px */
@@ -746,6 +748,115 @@ void gm_outport(uint16_t port, uint16_t v)
     gm_outportb(port, (uint8_t)v);
     gm_outportb((uint16_t)(port + 1), (uint8_t)(v >> 8));
 }
+/* ---------------------------------------------------------------------------------------------
+ * GM_KEYSCRIPT=<file>: the keyboard of a test run (baseline/editors/KEYS.C does the same under DOS). One event per line,
+ * with a delay in BIOS ticks (18.2 per second) counted from the previous event (a key counts when the program takes it):
+ *   K <delay> <hex>   the key <scan code << 8 | ASCII> becomes available      S <delay> <hex>   shift-state byte
+ *   D <delay> <name>  dump the screen: mode byte, 768 DAC bytes, 64000 (mode 13h) or 4000 (text) bytes
+ *   Q <delay>         end the program
+ * While a script is active the real keyboard and GM_TYPE are ignored.
+ * ------------------------------------------------------------------------------------------- */
+typedef struct { char kind; double delay; unsigned val; int dx, dy; char name[16]; } KeyEv;
+static KeyEv *kev;
+static int kev_n, kev_cur = -1;                        /* -1: not looked at yet, -2: no script */
+static double kev_last;
+static unsigned kev_shift;
+
+static double bios_ticks(void) { return gm_os_time() * 18.2065; }
+
+static void kev_load(void)
+{
+    const char *path = getenv("GM_KEYSCRIPT");
+    kev_cur = -2;
+    if (!path) return;
+    FILE *f = fopen(path, "r");
+    if (!f) { fprintf(stderr, "GM_KEYSCRIPT: cannot open %s\n", path); return; }
+    char line[120];
+    kev = (KeyEv *)calloc(1000, sizeof(KeyEv));
+    while (fgets(line, sizeof line, f) && kev_n < 1000) {
+        char k = line[0];
+        if (k != 'K' && k != 'S' && k != 'D' && k != 'F' && k != 'M' && k != 'Q') continue;
+        KeyEv *e = &kev[kev_n];
+        unsigned long d = 0;
+        unsigned v = 0;
+        char name[16] = "";
+        if (k == 'D' || k == 'F') { if (sscanf(line + 1, "%lu %12s", &d, name) != 2) continue; strcpy(e->name, name); }
+        else if (k == 'M') { if (sscanf(line + 1, "%lu %d %d %u", &d, &e->dx, &e->dy, &v) != 4) continue; e->val = v; }
+        else if (k == 'Q') { if (sscanf(line + 1, "%lu", &d) != 1) continue; }
+        else { if (sscanf(line + 1, "%lu %x", &d, &v) != 2) continue; e->val = v; }
+        e->kind = k; e->delay = (double)d;
+        kev_n++;
+    }
+    fclose(f);
+    kev_cur = 0;
+    kev_last = bios_ticks();
+}
+
+static void kev_dump(const char *name)
+{
+    FILE *f = fopen(name, "wb");
+    if (!f) return;
+    int gfx = video_mode == 0x13;
+    fputc(gfx ? 0x13 : 3, f);
+    for (int i = 0; i < 256; i++) fwrite(dac[i], 1, 3, f);
+    fwrite(gfx ? VRAM : TEXT, 1, gfx ? 64000 : 4000, f);
+    fclose(f);
+}
+
+/* the script's events that are not keys, when they are due and no key is next: they do not need the program to ask for the keyboard
+ * (a mouse-only wait such as the integrator's graph never does) */
+static void kev_poll(void)
+{
+    if (kev_cur == -1) kev_load();
+    if (kev_cur < 0) return;
+    while (kev_cur < kev_n) {
+        KeyEv *e = &kev[kev_cur];
+        if (e->kind == 'K' || bios_ticks() - kev_last < e->delay) break;
+        if (e->kind == 'S') kev_shift = e->val;
+        else if (e->kind == 'D') kev_dump(e->name);
+        else if (e->kind == 'F') { }
+        else if (e->kind == 'M') {
+            int ystep = video_mode == 0x13 ? 1 : 2;
+            headless_mx += e->dx * 2; headless_my += e->dy * ystep;
+            if (headless_mx < 0) headless_mx = 0;
+            if (headless_mx > 639) headless_mx = 639;
+            if (headless_my < 0) headless_my = 0;
+            if (headless_my > 199) headless_my = 199;
+            headless_buttons = (int32_t)e->val;
+        }
+        else if (e->kind == 'Q') exit(0);
+        kev_cur++;
+        kev_last = bios_ticks();
+    }
+}
+/* the key that is due now (consumed if `take`); events that are not keys are carried out on the way */
+static int kev_key(unsigned *key, int take)
+{
+    for (;;) {
+        if (kev_cur >= kev_n) return 0;
+        KeyEv *e = &kev[kev_cur];
+        if (bios_ticks() - kev_last < e->delay) return 0;
+        if (e->kind == 'K') {
+            *key = e->val;
+            if (take) { kev_cur++; kev_last = bios_ticks(); }
+            return 1;
+        }
+        if (e->kind == 'S') kev_shift = e->val;
+        else if (e->kind == 'D') kev_dump(e->name);
+        else if (e->kind == 'F') { /* the ROM font of a DOS machine: nothing to write here */ }
+        else if (e->kind == 'M') {                          /* the mouse moves by cursor units (320 across, a text row is 4): headless pointer */
+            int ystep = video_mode == 0x13 ? 1 : 2;
+            headless_mx += e->dx * 2; headless_my += e->dy * ystep;
+            if (headless_mx < 0) headless_mx = 0; if (headless_mx > 639) headless_mx = 639;
+            if (headless_my < 0) headless_my = 0; if (headless_my > 199) headless_my = 199;
+            headless_buttons = (int32_t)e->val;
+        }
+        else if (e->kind == 'Q') exit(0);
+        kev_cur++;
+        kev_last = bios_ticks();
+    }
+}
+
 
 /* ---------------------------------------------------------------------------------------------
  * BIOS
@@ -753,6 +864,14 @@ void gm_outport(uint16_t port, uint16_t v)
 uint16_t gm_bioskey(int16_t cmd)
 {
     gm_pump();
+    if (kev_cur == -1) kev_load();
+    if (kev_cur != -2) {                                       /* a test script plays the keyboard */
+        unsigned key;
+        if (cmd == 2) return (uint16_t)(kev_shift & 0xFF);
+        if (cmd == 1) return kev_key(&key, 0) ? (uint16_t)key : 0;
+        while (!kev_key(&key, 1)) { gm_pump(); gm_os_sleep_ms(1); }
+        return (uint16_t)key;
+    }
     if (cmd == 2) return (uint16_t)(shift_held() ? 3 : 0);
     if (cmd == 1) return bios_n ? bios_buf[0] : 0;
     while (!bios_n) { gm_pump(); gm_os_sleep_ms(1); }          /* cmd 0: block */
@@ -823,4 +942,16 @@ uint32_t gm_farsize(const void *p)
     for (int i = 0; i < nblocks; i++)
         if (blocks[i].off == off && blocks[i].used) return blocks[i].size;
     return 0;
+}
+
+/* ---------------------------------------------------------------------------------------------
+ * exit() with a memory (see dosplat.h)
+ * ------------------------------------------------------------------------------------------- */
+int gm_exit_code;
+void (*gm_exit_hook)(void);
+void gm_exit(int code)
+{
+    gm_exit_code = code;
+    if (gm_exit_hook) gm_exit_hook();
+    exit(code);
 }

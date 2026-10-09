@@ -49,6 +49,8 @@ static void log_callback(int level, const char *fmt, va_list args)
     if (level >= LOG_WARNING) fprintf(stderr, "%s\n", msg);
 }
 
+static int fb_opened;
+
 void fb_open(const char *title, int scale)
 {
     SetTraceLogCallback(log_callback);
@@ -58,6 +60,7 @@ void fb_open(const char *title, int scale)
     SetExitKey(KEY_NULL);               /* Esc belongs to the game; closing the window is the way out of the program */
     SetTargetFPS(60);
     make_texture(FB_W, FB_H);
+    fb_opened = 1;
 #ifndef __EMSCRIPTEN__                 /* a browser only allows full screen from a click, so the page does it */
     if (gm_settings.fullscreen) fb_set_fullscreen(1);
 #endif
@@ -65,6 +68,8 @@ void fb_open(const char *title, int scale)
 
 void fb_close(void)
 {
+    if (!fb_opened) return;             /* idempotent: the web page closes the window when a program ends, and so may the engine */
+    fb_opened = 0;
     UnloadTexture(tex);
     CloseWindow();
 }

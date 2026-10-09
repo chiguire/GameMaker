@@ -34,7 +34,15 @@ extern "C" char far *GetROMFont(void)
   {
   uint8_t *rom = (uint8_t *)MK_FP(0xF000, 0xFA6E);
   static int init = 0;
-  if (!init) { memcpy(rom, font8x8, sizeof font8x8); init = 1; }
+  if (!init)
+    {
+    memcpy(rom, font8x8, sizeof font8x8);
+    // Test aid: GM_ROMFONT=<file> replaces the glyphs with a 2048 byte dump of another machine's ROM font (the editors
+    // oracle uses the one DOSBox shows: baseline/editors), so that screens can be compared pixel for pixel.
+    if (const char *path = getenv("GM_ROMFONT"))
+      if (FILE *f = fopen(path, "rb")) { if (fread(rom, 1, 2048, f) != 2048) memcpy(rom, font8x8, sizeof font8x8); fclose(f); }
+    init = 1;
+    }
   return (char *)rom;
   }
 

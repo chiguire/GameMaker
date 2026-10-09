@@ -133,6 +133,7 @@ typedef uint32_t gm_ulong;
 /* ---- name clashes with the modern C runtime ---- */
 #define clock gm_clock                 /* engine tick counter vs <time.h> clock() */
 #define main gm_game_main              /* the real main() lives in the port; it calls this */
+#define exit(c) gm_exit((int)(c))      /* remembers the code for the web page (see dosplat.h) */
 static inline void gotoxy(int x, int y) { (void)x; (void)y; }  /* text-mode cursor: no text mode here */
 
 /* ---- string and file functions that differ between Borland/MSVC and POSIX ---- */
@@ -152,6 +153,7 @@ static inline char *strlwr(char *s) { for (char *p = s; *p; p++) *p = (char)tolo
 /* DOS file names on a case-sensitive file system with "/" separators: see dospath.c */
 #define fopen   gm_fopen
 #define remove  gm_remove
+#define mkdir(p) gm_mkdir(p)
 #endif
 
 /* ---- misc Borland runtime ---- */
@@ -167,5 +169,20 @@ static inline char *strlwr(char *s) { for (char *p = s; *p; p++) *p = (char)tolo
 
 /* Everything above uses real ints; from here on engine code sees the 16-bit int of the original. */
 #define int short
+
+#ifdef __cplusplus
+/* BLOCEDIT and MAPMAKER define their own integer square root, int sqrt(int); the original passes it 32-bit values, which
+ * C++ would otherwise resolve to the ambiguous float/double/long double overloads of <math.h>. */
+int sqrt(int x);
+static inline int sqrt(gm_long v) { return sqrt((int)v); }
+
+/* 20x20 block routines (BLOC.H) are declared for unsigned char; some callers pass plain char pointers. */
+extern "C" { int drawblk(int x, int y, unsigned char *bloc); int getblk(int x, int y, unsigned char *bloc); }
+static inline int drawblk(int x, int y, char *bloc) { return drawblk(x, y, (unsigned char *)bloc); }
+static inline int getblk(int x, int y, char *bloc) { return getblk(x, y, (unsigned char *)bloc); }
+#endif
+
+#define _SP 0x7FFF                    /* stack pointer: MAPMAKER's flood fill checks it against 100 */
+#define setcbrk(x) ((void)0)          /* Ctrl-Break checking: no DOS */
 
 #endif

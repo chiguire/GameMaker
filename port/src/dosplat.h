@@ -18,6 +18,13 @@ extern "C" {
  * matched case-insensitively against what is on disk. On Windows the C runtime already does all of that. */
 FILE    *gm_fopen(const char *name, const char *mode);
 int      gm_remove(const char *name);
+int      gm_mkdir(const char *name);          /* POSIX hosts only: DOS mkdir(name) */
+
+/* exit(code) of the original programs: the code is remembered so that the web page, which hosts one program after the
+ * other, can read it from an atexit handler (the editors end through exit(next program)). */
+extern int gm_exit_code;
+void     gm_exit(int code);
+extern void (*gm_exit_hook)(void);   /* called by gm_exit() before exit(): the web page's way to learn that a program ended (EXIT_RUNTIME=0 skips atexit) */
 /* Writes the host path for a DOS name to `out` (the name unchanged if nothing matches). Returns 1 if it exists. */
 int      gm_resolve_path(const char *dosname, char *out, size_t cap);
 

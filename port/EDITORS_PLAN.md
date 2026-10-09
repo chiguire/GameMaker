@@ -104,3 +104,46 @@ Not done yet in phase 1:
   `setmoupos` is honoured, but check each editor), Ctrl/Alt key state, real-mouse feel at 640x480 and larger.
 - Web: `NewTimer(...)` and the other `(...)` interrupt handlers need exact function types in wasm; OS pointer warping
   does not exist in a browser (the cursor must then follow the pointer without warping).
+
+## Status (2026-10-09, end of phase 1)
+
+Phase 1 is done for the native and the web build, except the player inside the shell.
+
+- All ten programs (`menu utility palchos blocedit monedit mapmaker charedit image sndedit grator`) build natively
+  (`port\build.bat`, `cmake/Editors.cmake`) and with Emscripten (node target for headless checks, browser target for
+  the page). `gmlaunch` replaces `GM.EXE` natively (runs them by exit code).
+- Native round trips, byte-identical to the shipped files: `.pal .bbl .mon .map .chr .snd .gam`. Graphical edit screens
+  of palchos, monedit, mapmaker, charedit, sndedit, grator and blocedit open and show real data; `image` loads a GIF.
+  Not yet compared with DOS output after *editing* (only load -> save without changes), and the GIF cutting, block
+  editing tools, map drawing, sound recording-free tools etc. are not exercised beyond opening.
+- Web: `bash port/build_web_editors.sh` -> `port/web-editors/` (page `web/editors.html` + `web/gmedit-web.js`, one
+  ES module per program, `/gm` in IndexedDB, seeded from `gmdata.zip` = help files + config + the SAMPLE game).
+  Tried in headless Chrome (CDP): menu -> Design -> Palette designer (a second module) -> Quit -> back to the menu; a
+  palette saved in one browser session is listed in the next one. Not tried: other browsers, touch, real audio, the other
+  editors inside the page (they run under Node and natively).
+- The menu's "Play" shows a note: the player is still its own page (`index.html` of `build_web.sh`).
+
+Findings of this stage worth knowing (details in the code comments):
+- On the web `exit()` does not run `atexit` (EXIT_RUNTIME=0): `gm_exit()` (dosplat.c) remembers the code and calls
+  `gm_exit_hook`, which tells the page.
+- Static objects run before the page has put the data folder in place (`ConfigData` in GENC.C reads gm.cfg): the web
+  entry calls `gm_reload_config()` first and `gm_save_config()` at the end.
+- Interrupt handlers called through a pointer need the exact C type under WebAssembly (`NewTimer(void)`).
+- Clang/GCC: friend-only declarations are not visible (CheckJoyStick, CursorClassDraw, NewTimer), redundant `Class::`
+  qualifiers, narrowing in `char` tables, POSIX `mkdir(path)`, a missing `io.h`, DOS `^Z` end of file in the mirrored sources
+  (CMake `string(REPLACE)` does not match it; `string(FIND)` does).
+- The pointer: a new window reports (0,0) before the real position, which dragged the highlight to the last menu item;
+  the first 0.6 s only set the reference. In a browser the pointer cannot be moved by the program, so after a keyboard
+  move the next pointer movement pulls the cursor back to the pointer (as any web menu).
+
+Next (phase 2 and 3 of this plan): exercise each editor's real work (drawing, cutting a GIF into blocks, map edits,
+sound editing) against DOS, put the player into the shell (Play), project import/export and the polish list.
+
+## Status (2026-10-09, DOS comparison)
+
+The editors were compared with the original DOS editors (rebuilt from the repository source) using scripted keys and mouse
+input: see `baseline/editors/README.md`. Every screen dump and saved file compared is identical (palette, block, monster, map,
+sound, integrator, image reader, utility, menu; character maker menus), including edits made with the mouse; only clock-driven
+animation fields in `.MON` are masked. Found and fixed on the way: raw NUL bytes in nine string literals. Not done: the character
+maker's graphical sequence editors, folding the mouse cases into `baseline/editors/suite.ps1`, re-running the browser build after
+the latest `dosplat.c`/`gfx_asm.cpp`/NUL changes (`build_web_editors.sh`).

@@ -229,7 +229,7 @@ class GameClass
     {
     MaxScenes=0;
     NumScenes=0;
-    if (scns) delete scns;
+    if (scns) delete [] scns;
     scns=NULL;
     }
 

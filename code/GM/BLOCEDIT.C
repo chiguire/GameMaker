@@ -1797,13 +1797,13 @@ int blocnum(int mun)
 //GAS
 static void DrawFnBut(int drawfn,int x,int y, unsigned char col[4])
   {
-  char array[][26]= {"   UPUAUT¥AZTUAUT5UÀÿð", 
-                     "   UPUA¥T¥AU¤UAUT5UÀÿð",
-                     "   UP" "\x1A" "ªA•dVA•dVAª¤5UÀÿð",
-                     "   UP" "\x1A" "ªAª¤" "\x1A" "ªAª¤" "\x1A" "ªAª¤5UÀÿð",
-                     "   UPUAZTYAe”¥AUT5UÀÿð",
-                     "   UPUAZT©Aj”¥AUT5UÀÿð",
-                     "   ª *ª‚ª¨*ª‚ª¨*ª‚ª¨:ªÀÿð"};
+  char array[][26]= {"\000\000\000UPUAUT¥AZTUAUT5UÀÿð", 
+                     "\000\000\000UPUA¥T¥AU¤UAUT5UÀÿð",
+                     "\000\000\000UP" "\x1A" "ªA•dVA•dVAª¤5UÀÿð",
+                     "\000\000\000UP" "\x1A" "ªAª¤" "\x1A" "ªAª¤" "\x1A" "ªAª¤5UÀÿð",
+                     "\000\000\000UPUAZTYAe”¥AUT5UÀÿð",
+                     "\000\000\000UPUAZT©Aj”¥AUT5UÀÿð",
+                     "\000\000\000ª *ª‚ª¨*ª‚ª¨*ª‚ª¨:ªÀÿð"};
 
   draw4dat(x,y,array[drawfn],9,9,col);
   }
@@ -1812,15 +1812,15 @@ static void DrawFnBut(int drawfn,int x,int y, unsigned char col[4])
 
 void DrawKeyBut(int butnum,int x,int y, unsigned char col[4])
   {
-  char array[][26]= {"   UP¥Aj”" "\x1A" "ªAZT¥AZT5UÀÿð",
-                     "   UP¥AZT¥Aª¤©AZT5UÀÿð",
-                     "   UPeAV”" "\x1A" "ªAª¤iAVT5UÀÿð",
-                     "   UP•AiT" "\x1A" "ªAª¤•AYT5UÀÿð",
-                     "   UP•AiT" "\x1A" "ªAid–AUd5UÀÿð",
-                     "   UPeAª”eAYTªAYT5UÀÿð",
-                     "   UPUAe”jA©”YAU”5UÀÿð",
-                     "   UP¥AZT" "\x1A" "ªAª¤¥AZT5UÀÿð",
-                     "   UPUAUT" "\x1A" "ªAª¤UAUT5UÀÿð"};
+  char array[][26]= {"\000\000\000UP¥Aj”" "\x1A" "ªAZT¥AZT5UÀÿð",
+                     "\000\000\000UP¥AZT¥Aª¤©AZT5UÀÿð",
+                     "\000\000\000UPeAV”" "\x1A" "ªAª¤iAVT5UÀÿð",
+                     "\000\000\000UP•AiT" "\x1A" "ªAª¤•AYT5UÀÿð",
+                     "\000\000\000UP•AiT" "\x1A" "ªAid–AUd5UÀÿð",
+                     "\000\000\000UPeAª”eAYTªAYT5UÀÿð",
+                     "\000\000\000UPUAe”jA©”YAU”5UÀÿð",
+                     "\000\000\000UP¥AZT" "\x1A" "ªAª¤¥AZT5UÀÿð",
+                     "\000\000\000UPUAUT" "\x1A" "ªAª¤UAUT5UÀÿð"};
 
   draw4dat(x,y,array[butnum],9,9,col);
   }
@@ -2072,7 +2072,7 @@ static int animons(void)
 static void infob(int x,int y, unsigned char col[4])
   {
   static char infoar[] =
-  {"         UUUUUUU@UUUUUUUTU]××ÕUTUU]÷u]uUUUU]ÿ]uUUUU]ßu]uUU•U]×uWÕUVUUUUUUUT)UUUUUUUhªªªªªªª€"};
+  {"\000\000\000\000\000\000\000\000\000UUUUUUU@UUUUUUUTU]××ÕUTUU]÷u]uUUUU]ÿ]uUUUU]ßu]uUU•U]×uWÕUVUUUUUUUT)UUUUUUUhªªªªªªª€"};
 
   draw4dat(x,y,infoar,35,10,col);
   }
@@ -2080,7 +2080,7 @@ static void infob(int x,int y, unsigned char col[4])
 static void AniBut(int x,int y, unsigned char col[4])
   {
   static char animar[] =
-  {"         UUUUUUU@UUUUUUUTõ×wW__ßÔW]÷wßu×]UWýÿwÿ×_UW]ßwwu×]U—]×wWu×_ÖUUUUUUUT)UUUUUUUhªªªªªªª€"};
+  {"\000\000\000\000\000\000\000\000\000UUUUUUU@UUUUUUUTõ×wW__ßÔW]÷wßu×]UWýÿwÿ×_UW]ßwwu×]U—]×wWu×_ÖUUUUUUUT)UUUUUUUhªªªªªªª€"};
   draw4dat(x,y,animar,35,10,col);
   }
 
@@ -2999,7 +2999,6 @@ void DrawTrashCan(int x,int y, unsigned char col[4])
 
 void DrawCanTop(int x,int y, unsigned char col[4])
   {
-  //char array[]= {"                        <      k      ¯      <           :Z¿  ÿÕj«ÿ ?¥ªj¿ÿðjUjªÿÿëUªªª¯ê¿%UjªªªüUUVªªÀ  %U«  "};
   char array[]= {   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, 60,  0,  0,  0,  0,  0,  0,107,  0,  0,  0,  0,  0,  0,175,  0,  0,  0,  0,  0,  0, 60,  0,  0,  0,  0,  0,  0, 28,  0,  0,  0,  0,  0, 58, 90,191,  0,  0,  3,255,213,106,171,255,  0, 63,165,170,106,191,255,240,106, 85,106,170,255,255,235, 85,170,170,170,175,234,191, 37, 85,106,170,170,170,252,  2, 85, 85, 86,170,170,192,  0,  0, 37, 85,171,  0,  0,};
   draw4dat(x,y,array,27,15,col,8);
   }

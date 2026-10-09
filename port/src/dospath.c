@@ -93,6 +93,14 @@ int gm_remove(const char *name)
     return remove(path);
 }
 
+/* DOS mkdir takes only the name; the directory is created under the name as the DOS file system would find it */
+int gm_mkdir(const char *name)
+{
+    char path[1100];
+    gm_resolve_path(name, path, sizeof path);
+    return mkdir(path, 0777);
+}
+
 #else   /* Windows: the C runtime already ignores case and accepts both separators */
 
 int gm_resolve_path(const char *dosname, char *out, size_t cap)

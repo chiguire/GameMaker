@@ -1548,9 +1548,9 @@ static void drawchar(int x,int y,frames now,char col2)
 
 static void DrawFnButs(int x,int y,char orient)
   {
-  char funar[3][26]= {"   UPeAV”" "\x1A" "ªA–”eA•T5UÀÿğ",
-                      "   UPeAª”eAYTªAYT5UÀÿğ",
-                      "   UPUAe”jA©”YAU”5UÀÿğ"};
+  char funar[3][26]= {"\000\000\000UPeAV”" "\x1A" "ªA–”eA•T5UÀÿğ",
+                      "\000\000\000UPeAª”eAYTªAYT5UÀÿğ",
+                      "\000\000\000UPUAe”jA©”YAU”5UÀÿğ"};
   unsigned char col[2][4] = { { FaceCols[GREY3],FaceCols[RED1],
                        FaceCols[BLACK],FaceCols[RED2] },
                      { FaceCols[GREY3],FaceCols[RED3],
@@ -1598,20 +1598,20 @@ static void drawscrn(void)
 
 void shootb(int x,int y, unsigned char col[4])
   {
-  char shootar[] = "         UUUUUUU@UUUUUUUTW÷]}_õTU]W]×u×UUUW×ı×u×UUUUw]×u×UU•_×]}_WUVUUUUUUUT)UUUUUUUhªªªªªªª€";
+  char shootar[] = "\000\000\000\000\000\000\000\000\000UUUUUUU@UUUUUUUTW÷]}_õTU]W]×u×UUUW×ı×u×UUUUw]×u×UU•_×]}_WUVUUUUUUUT)UUUUUUUhªªªªªªª€";
   draw4dat(x,y,shootar,35,10,col);
   }
 
 /*  // Now Defined in Facelift.c
 static void menub(int x,int y, unsigned char col[4])
   {
-  char array[]= {" UUUUUUU@Zªªªªªª•j««¿î»®ªPjªûî«îëª¤Zª¾ûúûºê©Vª®îê»îºªQª««º®û®ªZªêïû®¾ª”jªªªªªªT UUUUUUP "};
+  char array[]= {"\000UUUUUUU@Zªªªªªª•j««¿î»®ªPjªûî«îëª¤Zª¾ûúûºê©Vª®îê»îºªQª««º®û®ªZªêïû®¾ª”jªªªªªªT\000UUUUUUP\000"};
    draw4dat(x,y,array,36,9,col);
   }
 
 static void helpb(int x,int y, unsigned char col[4])
   {
-  char array[]= {" UUUUUUU@Zªªªªªª•j«®ÿº¯êªPjªëº®«®ª¤Zª¿ï«ªëª©Vª®»ªê¿ªªQª«®êº®ªªZªë¿ïûªª”jªªªªªªT UUUUUUP "};
+  char array[]= {"\000UUUUUUU@Zªªªªªª•j«®ÿº¯êªPjªëº®«®ª¤Zª¿ï«ªëª©Vª®»ªê¿ªªQª«®êº®ªªZªë¿ïûªª”jªªªªªªT\000UUUUUUP\000"};
    draw4dat(x,y,array,36,9,col);
   }
 */

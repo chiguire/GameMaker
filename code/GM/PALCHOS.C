@@ -569,13 +569,13 @@ static void dohelp(void)
   
 void plushalf(int x,int y, unsigned char col[4])
   {
-  char plusar[]= {"    UUU@UUUTUWUTUWUUUõUUWUUUWUVUUUTUUUhªªª€"};
+  char plusar[]= {"\000\000\000\000UUU@UUUTUWUTUWUUUõUUWUUUWUVUUUTUUUhªªª€"};
    draw4dat(x,y,plusar,15,10,col);
   }
 
 void minushalf(int x,int y, unsigned char col[4])
   {
-  char minusar[]= {"    UUUUUUUUUUUUUU_ýUUUUU•UUUUUU)UUUªªª"};
+  char minusar[]= {"\000\000\000\000UUUUUUUUUUUUUU_ýUUUUU•UUUUUU)UUUªªª"};
    draw4dat(x,y,minusar,15,10,col);
   }
 

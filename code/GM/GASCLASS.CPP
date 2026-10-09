@@ -221,7 +221,7 @@ CursorClass::CursorClass(DrawingBoard *s)
   Limits.lr   = Limits.ul = MakeCoord2d(0,0);
   Behind      = new GPFClass;
   CurGPF      = NULL;
-  Time.AddFn(CursorClassDraw ,((void (far*)(void*)) this));        // Link the polling to the timer
+  Time.AddFn(CursorClassDraw ,((void *) this));        // Link the polling to the timer
   }
 
 void CursorClass::NewGPF(GPFClass *NewOne)

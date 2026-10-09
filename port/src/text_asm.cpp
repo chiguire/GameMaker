@@ -11,7 +11,16 @@
 
 unsigned char clrchar = 32;                       // char clrbox() fills with (DATASEG _clrchar)
 
-static inline uint8_t *text(void) { return gm_dosmem + 0xB8000; }
+static inline uint8_t *text(void)
+  {
+  static bool cleared = false;                // a PC starts with a cleared text screen (blank, light grey on black)
+  if (!cleared)
+    {
+    cleared = true;
+    for (int i = 0; i < 80 * 25; i++) { gm_dosmem[0xB8000 + i * 2] = ' '; gm_dosmem[0xB8000 + i * 2 + 1] = 7; }
+    }
+  return gm_dosmem + 0xB8000;
+  }
 
 static inline uint16_t cell(int x, int y) { return (uint16_t)(((uint16_t)(y * VIDLEN) + (uint16_t)x) * 2); }
 

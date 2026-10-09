@@ -17,12 +17,13 @@
 #include "geninput.hpp"
 #include "dosplat.h"
 #include "graph.h"
+#include "osclock.h"
 
 gm_ulong Clock = 0;
 gm_ulong OldTimer = 0;
 unsigned int MyDS = 0;
 
-void interrupt NewTimer(...)
+void interrupt NewTimer(void)
   {
   Clock++;
   }
@@ -59,6 +60,11 @@ static void PollMouse(void)
     curx = Cur.Pos.x; cury = Cur.Pos.y;
     started = 1;
     }
+  // A new window first reports the pointer at (0,0), then where it really is. That is not the user moving the mouse, so
+  // for the first moments the pointer only sets the reference position.
+  static double settle_until = -1;
+  if (settle_until < 0) settle_until = gm_os_time() + 0.6;
+  if (gm_os_time() < settle_until) { lastx = vx; lasty = vy; }
   int dx = (int)(vx / 2) - (int)(lastx / 2);            // in cursor units: 320 across the picture
   int dy = (int)(vy / ystep()) - (int)(lasty / ystep());
   lastx = vx; lasty = vy;
