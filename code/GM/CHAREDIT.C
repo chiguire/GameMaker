@@ -103,7 +103,7 @@ RGBdata              colors[256];
 monstruct            m[LASTMON];
 int                  curblk,curfram;
 static char          saved=1;
-unsigned long int    oldtime=0;
+gm_ulong    oldtime=0;
 extern char          curfile[31];
 extern unsigned char FaceCols[MAXFACECOL];      //Screen colors
 extern char          *FontPtr;
@@ -176,7 +176,7 @@ QuitCodes main(int argc,char *argv[])
     writestr(0,1,31,"  Palette  Block  Monster  Map  Character  Image  Sound  Integrator  Main  Help ");
     attr = openmenu(30,3,24,14,w);
     writestr(30,3,PGMTITLECOL,"    CHARACTER  MAKER    ");
-    writestr(30,4,PGMTITLECOL,"      Version "GMVER"      ");
+    writestr(30,4,PGMTITLECOL,"      Version " GMVER "      ");
     writestr(30,5,PGMTITLECOL,"    By  Oliver Stone    ");
     writestr(30,6,PGMTITLECOL,"   Copyright (C) 1994   ");
     writestr(30,8,attr+14, " Choose a Character Set");

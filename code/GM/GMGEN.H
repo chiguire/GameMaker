@@ -34,7 +34,9 @@ extern char NewAbortMSG(char *str);
 #define RIGHTKEY  77
 #define LEFTKEY   75
 
+#ifndef GM_PORT                    // the port is the full version: the demo restrictions (save only maps, ...) stay out
 #define CRIPPLEWARE
+#endif
 
 extern void GraphMode(void);
 extern void TextMode(void);

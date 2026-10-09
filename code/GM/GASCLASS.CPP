@@ -5,7 +5,7 @@
 #include "windclss.hpp"
 #include "gasclass.hpp"
 extern TimerClass Time;
-extern int CurMode;
+extern unsigned int CurMode;
 
 unsigned int GPFClass::Length(void)
   {
@@ -38,7 +38,7 @@ unsigned int GPFClass::Length(void)
         return(0);
       }
     }
-  return( (unsigned int) ( ((unsigned long int) cur)-((unsigned long int) PicInfo)) );
+  return( (unsigned int) ( ((gm_ulong) cur)-((gm_ulong) PicInfo)) );
   }
 
 

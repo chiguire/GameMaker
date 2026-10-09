@@ -97,6 +97,10 @@ void     gm_nosound(void);
  * and presents the VGA frame. Safe to call from anywhere in the engine's waiting loops. */
 void     gm_pump(void);
 
+/* A function gm_pump() calls on every pass, where a DOS program would have had an interrupt handler: the editors'
+ * mouse handler (INT 33h function 0Ch, see newmouse_port.cpp). One hook; NULL removes it. */
+void     gm_set_pump_hook(void (*hook)(void));
+
 #ifdef __cplusplus
 }
 #endif

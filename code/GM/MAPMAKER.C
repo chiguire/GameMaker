@@ -220,7 +220,7 @@ void main(int argc,char *argv[])
     writestr(0,0,79,GMTOPBAR);
     writestr(0,1,31,"  Palette  Block  Monster  Map  Character  Image  Sound  Integrator  Main  Help ");
     writestr(30,3,PGMTITLECOL,"        MAP  MAKER        ");
-    writestr(30,4,PGMTITLECOL,"       Version "GMVER"       ");
+    writestr(30,4,PGMTITLECOL,"       Version " GMVER "       ");
     writestr(30,5,PGMTITLECOL,"     By Gregory Stone     ");
     writestr(30,6,PGMTITLECOL,"    Copyright (C) 1994    ");
     writestr(31,8,attr+14, "Choose a Map");
@@ -537,7 +537,7 @@ static int edit(void)
           {
           static unsigned int Rate=0;
           static unsigned int ScrollCnt=0;
-          static unsigned long int OldClock=0;
+          static gm_ulong OldClock=0;
           int OldChange;
           changed=0;
 
@@ -1590,16 +1590,16 @@ static void HiCircle(int centx, int centy, int x1, int y1, void point(int x,int 
   {
   int RadSquared=0;
   register int x=0,y=0;
-  long int radius=1;
+  gm_long radius=1;
 
   x1-=centx;
   y1-=centy;
 
   RadSquared = ((x1*x1)+(y1*y1));
-  radius = (long int) RadSquared;
+  radius = (gm_long) RadSquared;
   radius *= (7071* 7071);
   radius /=(10000*10000);  
-  radius=(long int) sqrt( (int) radius );
+  radius=(gm_long) sqrt( (int) radius );
  // radius *= .707106781; // # is cos(PI/4) - makes radius only go halfway around the circle
 
   for (y=0; y<=radius; y++)

@@ -131,6 +131,11 @@ if(NOT WIN32 AND NOT EMSCRIPTEN)
   endif()
 endif()
 
+option(GM_EDITORS "build the design tools (menu, utility, palchos, ...)" ON)
+if(GM_EDITORS AND NOT EMSCRIPTEN)     # the web build of the editors comes later (EDITORS_PLAN.md, phase 1)
+  include(cmake/Editors.cmake)
+endif()
+
 if(EMSCRIPTEN)
   # Every wait in the engine is a loop that calls gm_pump(); Asyncify lets that code park itself so that the browser
   # (or Node) can run in between (see gm_os_yield in src/dosfind.c).

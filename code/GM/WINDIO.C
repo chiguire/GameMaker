@@ -676,8 +676,15 @@ int horizmenu(int itemnum,int curitem,int y,...)  // Dots are start of each item
   int joypos=0,joybut=0;
   #endif  
 
+#ifdef GM_PORT
+  // The x coordinates are variable arguments (32-bit here), not 16-bit words on the stack after y.
+  int lensbuf[24];
+  { va_list ap; va_start(ap,y); for (int k=0;k<=itemnum && k<24;k++) lensbuf[k]=(int)va_arg(ap,int32_t); va_end(ap); }
+  lens=lensbuf;
+#else
   lens=&y;
   lens++;                // Lens now points to the x coord of the first item.
+#endif
 
   if (curitem==0) curitem++;
   curitem--;

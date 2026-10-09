@@ -182,7 +182,7 @@ QuitCodes main(int argc,char *argv[])
       if (w==NULL) w = new char [1000];
       attr = openmenu(50,3,27,12,w);
       writestr(50,3,PGMTITLECOL,"         INTEGRATOR        ");
-      writestr(50,4,PGMTITLECOL,"        Version "GMVER"       ");
+      writestr(50,4,PGMTITLECOL,"        Version " GMVER "       ");
       writestr(50,5,PGMTITLECOL,"      By Gregory Stone     ");
       writestr(50,6,PGMTITLECOL,"     Copyright (C) 1994    ");
       writestr(51,8,attr+14, "Choose a game");

@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 
-#include "d:\drv\gen.h"
+#include "gen.h"
 #include "gmgen.h"
 #include "mousefn.h"
 #include "jstick.h"

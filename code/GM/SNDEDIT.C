@@ -61,8 +61,8 @@ static void menub(int x,int y,unsigned char *col);
 static void prevb(int x,int y, unsigned char col[4]);
 static void cleanup(void);
 static void convcmf(void);
-static long int fgetvarlen(FILE *fp);
-static int fputvarlen(unsigned long int value,FILE *fp);
+static gm_long fgetvarlen(FILE *fp);
+static int fputvarlen(gm_ulong value,FILE *fp);
 extern unsigned char  FaceCols[MAXFACECOL];      //Screen colors
 extern char           *FontPtr;
 extern unsigned char  HiCols[4];
@@ -121,7 +121,7 @@ QuitCodes main(int argc,char *argv[])
     writestr(0,0,79,GMTOPBAR);
     writestr(0,1,31,"  Palette  Block  Monster  Map  Character  Image  Sound  Integrator  Main  Help ");
     writestr(50,3,PGMTITLECOL,"   SOUND DESIGNER   ");
-    writestr(50,4,PGMTITLECOL,"    Version "GMVER"    ");
+    writestr(50,4,PGMTITLECOL,"    Version " GMVER "    ");
     writestr(50,5,PGMTITLECOL,"  By  Oliver Stone  ");
     writestr(50,6,PGMTITLECOL," Copyright (C) 1994 ");
     writestr(50,8,attr+14, " Choose a Sound Set ");
@@ -444,7 +444,7 @@ static void convcmf(void)
   char     fileID[5] = {0,0,0,0,0};
   int      buff1[20];
   char     buff[70];
-  unsigned long int paws;
+  gm_ulong paws;
   
   if (!getfname(10,10,"Enter the file to convert: ","*.cmf\0",fileIN)) return;
   if ((fpin=fopen(fileIN,"rb")) == NULL)
@@ -503,7 +503,7 @@ static void convcmf(void)
     do
       {
       paws=fgetvarlen(fpin);
-      paws = ((unsigned long int)HDRCLK * paws)/(unsigned long int)origin;
+      paws = ((gm_ulong)HDRCLK * paws)/(gm_ulong)origin;
       if (!fputvarlen(paws,fpout)) error |= 2;  // number too big
       if (feof(fpin))
         {
@@ -542,12 +542,12 @@ static void convcmf(void)
   fclose(fpin);
  }
 
-static long int fgetvarlen(FILE *fp)
+static gm_long fgetvarlen(FILE *fp)
   {
-  long int value=0;
+  gm_long value=0;
   char c;
   
-  if ((value = (long int) fgetc(fp)) & 0x80)
+  if ((value = (gm_long) fgetc(fp)) & 0x80)
     {
     value &= 0x7F;
     do
@@ -558,9 +558,9 @@ static long int fgetvarlen(FILE *fp)
   return(value);
   }
   
-static int fputvarlen(unsigned long int value,FILE *fp)
+static int fputvarlen(gm_ulong value,FILE *fp)
   {
-  long int buffer;
+  gm_long buffer;
   
   if (value > 0x0FFFFFFF) return(0);
   buffer = value & 0x7F;

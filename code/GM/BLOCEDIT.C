@@ -185,7 +185,7 @@ extern unsigned char FaceCols[MAXFACECOL];      // Screen colors
 extern char          *FontPtr;
 extern unsigned char HiCols[4];
 static unsigned char grid[GLEN][GLEN];
-unsigned long int    nxtchg[BACKBL]; // Next time array for each block change.
+gm_ulong    nxtchg[BACKBL]; // Next time array for each block change.
 unsigned char        blkmap[BACKBL]; // Current block displayed on map Array.
 char                 Animate=FALSE;
 
@@ -229,7 +229,7 @@ QuitCodes main(int argc,char *argv[])
 #endif
   atexit(cleanup);
   FontPtr=GetROMFont();
-  blk=(blkstruct far *) farmalloc( (unsigned long int) ( ((unsigned long int)sizeof(blkstruct))*(BACKBL+1)));
+  blk=(blkstruct far *) farmalloc( (gm_ulong) ( ((gm_ulong)sizeof(blkstruct))*(BACKBL+1)));
   if (blk==NULL) { errorbox("NOT ENOUGH MEMORY!","  (Q)uit"); exit(menu);}
 
 #ifdef DEBUG
@@ -255,7 +255,7 @@ QuitCodes main(int argc,char *argv[])
     writestr(0,1,31,"  Palette  Block  Monster  Map  Character  Image  Sound  Integrator  Main  Help ");
     attr = openmenu(7,3,23,14,w);
     writestr(7,3,PGMTITLECOL, "    BLOCK DESIGNER     ");
-    writestr(7,4,PGMTITLECOL, "     Version "GMVER"      ");
+    writestr(7,4,PGMTITLECOL, "     Version " GMVER "      ");
     writestr(7,5,PGMTITLECOL, "   By Gregory Stone    ");
     writestr(7,6,PGMTITLECOL, "  Copyright (C) 1991   ");
     writestr(7,8,attr+14, " Choose a Block Set ");
@@ -347,7 +347,7 @@ static int edit(void)
   int mx,my,mbuts;
   int bnum=0,grabbed=-1;
   int changed=FALSE;
-  unsigned long int OldClock;
+  gm_ulong OldClock;
 
   moucur(TRUE);
   mouclearbut();
@@ -1895,7 +1895,7 @@ static void HiCircle(int centx, int centy, int x1, int y1, unsigned char bloc, i
   {
   int RadSquared=0;
   register int x=0,y=0;
-  long int radius=1;
+  gm_long radius=1;
 
   if (drawfn==1)
     {
@@ -1903,10 +1903,10 @@ static void HiCircle(int centx, int centy, int x1, int y1, unsigned char bloc, i
     x1-=centx;
     y1-=centy;
     RadSquared = ((x1*x1)+(y1*y1));
-    radius = (long int) RadSquared;
+    radius = (gm_long) RadSquared;
     radius *= 8;
     radius /=10;  
-    radius=(long int) sqrt( (int) radius );
+    radius=(gm_long) sqrt( (int) radius );
    // radius *= .707106781; // # is cos(PI/4) - makes radius only go halfway around the circle
   
     for (y=0; y<=radius; y++)

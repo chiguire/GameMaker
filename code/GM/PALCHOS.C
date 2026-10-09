@@ -116,7 +116,7 @@ QuitCodes main(int argc,char *argv[])
     writestr(0,1,31,"  Palette  Block  Monster  Map  Character  Image  Sound  Integrator  Main  Help ");
     attr=openmenu(1,3,21,11,w);
     writestr(1,3,PGMTITLECOL,"  PALETTE DESIGNER   ");
-    writestr(1,4,PGMTITLECOL,"    Version "GMVER"     ");
+    writestr(1,4,PGMTITLECOL,"    Version " GMVER "     ");
     writestr(1,5,PGMTITLECOL,"  By Gregory Stone   ");
     writestr(1,6,PGMTITLECOL," Copyright (C) 1994  ");
     writestr(2,8,attr+14, "Choose a Palette");
@@ -187,7 +187,7 @@ static void edit(void)
   int change,ink,ascii,scan,oldcol;
   int x=0,y=0,butnum=0,oldbut=-1;
   int grabbed=-1;
-  unsigned long int oldclk=1;
+  gm_ulong oldclk=1;
   int ButHit=0;
   int adder=-1;
   char morc=MOVE;

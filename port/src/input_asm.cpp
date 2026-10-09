@@ -84,6 +84,7 @@ extern "C" void ReadJoyStick(unsigned int far *x, unsigned int far *y, unsigned 
   *butn = (unsigned int)jb;
   }
 
+#ifndef GM_NEWMOUSE      /* the graphical editors bring their own mouse stack (TRANMOUS.HPP + newmouse_port.cpp) */
 /* ---------------------------------------------------------------------------------------------
  * Mouse. Coordinates follow the real driver: 640x200 virtual units in every video mode; the
  * engine divides by MXlatx/MXlaty (8 in text mode, 2 and 1 in mode 13h).
@@ -152,3 +153,4 @@ void mouclearbut(void)
   if (mouinstall)
     do { moustats(&x, &y, &but); gm_pump(); } while (but);
   }
+#endif /* GM_NEWMOUSE */

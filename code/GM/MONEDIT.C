@@ -136,7 +136,7 @@ void main(int argc,char *argv[])
   FontPtr=GetROMFont();
 
   /*---------------------Set up Block structure */
-  blk= (blkstruct far *) farmalloc( (unsigned long int) ( ((unsigned long int)sizeof(blkstruct))*(MONBL+2)));
+  blk= (blkstruct far *) farmalloc( (gm_ulong) ( ((gm_ulong)sizeof(blkstruct))*(MONBL+2)));
   if (blk==NULL) { errorbox("NOT ENOUGH MEMORY!","  (Q)uit"); exit(menu);}
   for (lx=0; lx<sizeof(blkstruct)*(MONBL+2 );lx++)
     *( ((unsigned char far *) blk)+lx)=0;
@@ -161,7 +161,7 @@ void main(int argc,char *argv[])
     writestr(0,1,31,"  Palette  Block  Monster  Map  Character  Image  Sound  Integrator  Main  Help ");
     attr = openmenu(20,3,22,13,w);
     writestr(20,3,PGMTITLECOL,"    MONSTER  MAKER    ");
-    writestr(20,4,PGMTITLECOL,"     Version "GMVER"     ");
+    writestr(20,4,PGMTITLECOL,"     Version " GMVER "     ");
     writestr(20,5,PGMTITLECOL,"   By  Oliver Stone   ");
     writestr(20,6,PGMTITLECOL,"  Copyright (C) 1994  ");
     writestr(20,8,attr+14, " Choose a Monster Set");

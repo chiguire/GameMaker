@@ -18,7 +18,9 @@
 
 #define GM_PORT 1
 #define GM_ENUM16 : short   /* Borland enums are 16 bits wide; several end up inside on-disk structs */
-#define MOUSE 1          /* playgame uses the "old mouse" interface (see PLAYGAME.C #error) */
+#ifndef GM_EDITOR
+#define MOUSE 1          /* playgame uses the "old mouse" interface (see PLAYGAME.C #error); the editors do not */
+#endif
 #define _CRT_SECURE_NO_WARNINGS 1
 #define _CRT_NONSTDC_NO_WARNINGS 1
 #define _USE_MATH_DEFINES 1

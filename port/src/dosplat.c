@@ -107,8 +107,11 @@ static int video_mode = 3;                         /* 3 = 80x25 text, 0x13 = 320
 /* Attribute-controller palette of the text modes: attribute 0..15 -> DAC index */
 static const uint8_t atc_text[16] = { 0, 1, 2, 3, 4, 5, 0x14, 7, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F };
 
+static int dac_ready;
+
 static void default_palette(void)
 {
+    dac_ready = 1;
     memset(dac, 0, sizeof dac);
     for (int i = 0; i < 64; i++) {                 /* EGA colours: bits (R,G,B) with 0x2A / 0x15 weights */
         dac[i][0] = (uint8_t)(((i >> 2) & 1) * 0x2A + ((i >> 5) & 1) * 0x15);
@@ -123,6 +126,9 @@ static void default_palette(void)
         for (int i = 0; i < 16; i++) { memcpy(dac[i], ega[i], 3); dac[16 + i][0] = dac[16 + i][1] = dac[16 + i][2] = grey[i]; }
     }
 }
+
+/* A PC starts in text mode with the BIOS palette; the editors draw their first screen without setting a mode. */
+static void dac_init(void) { if (!dac_ready) default_palette(); }
 
 static int mouse_shown;
 static FbRect game_rect = { 0, 0, 960, 720 };      /* where the VGA image landed in the window */
@@ -176,6 +182,7 @@ static void render_text(int mouse_cell_x, int mouse_cell_y)
 static void present(void)
 {
     int32_t mx, my, mb;
+    dac_init();
     gm_mouse_get(&mx, &my, &mb);
     if (video_mode == 0x13) {
         memcpy(fb_pix, VRAM, FB_W * FB_H);
@@ -555,6 +562,7 @@ static void fire_timer(void)
         next_tick += period;
         fired++;
         if (vectors[8] && !(pic_mask & 1)) { in_isr++; vectors[8](); in_isr--; }
+        if (vectors[0x1C]) { in_isr++; vectors[0x1C](); in_isr--; }      /* the BIOS tick handler calls INT 1Ch */
     }
     if (now >= next_tick) { dropped += (unsigned)((now - next_tick) / period) + 1; next_tick = now + period; }
     if (getenv("GM_TIMERLOG") && now >= next_report) {       /* test aid: how many timer ticks the engine got */
@@ -612,6 +620,9 @@ static void web_apply(void)
 }
 #endif
 
+static void (*pump_hook)(void);
+void gm_set_pump_hook(void (*hook)(void)) { pump_hook = hook; }
+
 void gm_pump(void)
 {
     gm_heartbeat++;
@@ -626,6 +637,7 @@ void gm_pump(void)
     type_keys();
     gm_audio_pump();
     fire_timer();
+    if (pump_hook) { in_isr++; pump_hook(); in_isr--; }
 #ifdef __EMSCRIPTEN__
     /* Every wait in the engine ends up here, which makes this the one place to give the browser a turn (to draw the
      * frame, deliver key and gamepad events and refill the audio buffer). Often enough for that, rarely enough that
@@ -671,6 +683,7 @@ void gm_mouse_set(int32_t vx, int32_t vy)
  * ------------------------------------------------------------------------------------------- */
 uint8_t gm_inportb(uint16_t port)
 {
+    if (port >= 0x3C7 && port <= 0x3C9) dac_init();
     switch (port) {
     case 0x3DA: {                       /* VGA input status: bit3 vertical retrace, bit0 display disabled */
         static uint32_t n;
@@ -710,6 +723,7 @@ uint16_t gm_inport(uint16_t port) { return gm_inportb(port); }
 
 void gm_outportb(uint16_t port, uint8_t v)
 {
+    if (port >= 0x3C7 && port <= 0x3C9) dac_init();
     switch (port) {
     case 0x3C7: dac_rd_idx = v; dac_rd_phase = 0; break;
     case 0x3C8: dac_wr_idx = v; dac_wr_phase = 0; break;
