@@ -312,7 +312,7 @@ static void key_event(int idx, int down)
 }
 
 /* ---------------------------------------------------------------------------------------------
- * Host controls: F11 / Alt+Enter full screen, F12 picture scaling, Alt+Up / Alt+Down volume, Alt+M mute.
+ * Host controls: F11 / Alt+Enter full screen, F12 picture scaling, Alt+Up / Alt+Down volume, Alt+M mute, Alt+G capture the mouse.
  * While Alt is held the chord keys are hidden from the game. (F11/F12 are not game keys: the engine knows F1-F10.)
  * Edges are detected here rather than with raylib's IsKeyPressed(), which stays true for every call within a frame.
  * ------------------------------------------------------------------------------------------- */
@@ -343,6 +343,32 @@ static void act_volume(int delta)
     gm_audio_set_volume(gm_settings.volume);
     gm_audio_set_mute(0);
     fb_toast("Volume %d%%", gm_settings.volume);
+}
+
+/* Mouse capture (Alt+G): the host cursor is hidden and the program's own cursor is the only one. The movement is added up
+ * here (cap_x/cap_y, window pixels), so the cursor stops at the picture's edge and leaves it as soon as the mouse turns
+ * back. On the web page the browser's pointer lock does the capturing (gmedit-web.js) and the page reports the position. */
+static int captured;
+static float cap_x, cap_y, cap_rx, cap_ry;
+static void act_capture(void)
+{
+#ifndef __EMSCRIPTEN__
+    if (!window_open || headless) return;
+    if (!captured) {
+        Vector2 p = GetMousePosition();
+        cap_x = p.x; cap_y = p.y;
+        DisableCursor();
+        p = GetMousePosition();
+        cap_rx = p.x; cap_ry = p.y;
+        captured = 1;
+        fb_toast("Mouse captured (Alt+G releases)");
+    } else {
+        captured = 0;
+        EnableCursor();
+        SetMousePosition((int)cap_x, (int)cap_y);
+        fb_toast("Mouse released");
+    }
+#endif
 }
 
 static void act_mute(void)
@@ -383,7 +409,7 @@ static int host_test_actions(void)
 
 static void host_controls(void)
 {
-    static int p_f11, p_f12, p_enter, p_up, p_down, p_m;
+    static int p_f11, p_f12, p_enter, p_up, p_down, p_m, p_g;
     host_alt = (IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT)) && !IsKeyDown(KEY_LEFT_CONTROL) && !IsKeyDown(KEY_RIGHT_CONTROL);
     int changed = host_test_actions();
 
@@ -392,10 +418,11 @@ static void host_controls(void)
     int up = edge(&p_up, host_alt && IsKeyDown(KEY_UP)), down = edge(&p_down, host_alt && IsKeyDown(KEY_DOWN));
     if (up || down) { act_volume(up ? 10 : -10); changed = 1; }
     if (edge(&p_m, host_alt && IsKeyDown(KEY_M))) { act_mute(); changed = 1; }
+    if (edge(&p_g, host_alt && IsKeyDown(KEY_G))) act_capture();
     if (changed) gm_settings_save();
 }
 
-static int chord_key(int rkey) { return rkey == KEY_ENTER || rkey == KEY_UP || rkey == KEY_DOWN || rkey == KEY_M; }
+static int chord_key(int rkey) { return rkey == KEY_ENTER || rkey == KEY_UP || rkey == KEY_DOWN || rkey == KEY_M || rkey == KEY_G; }
 
 /* ---------------------------------------------------------------------------------------------
  * Gamepad. In a game it is a joystick (ReadJoyStick, see input_asm.cpp); in the menus, which read the BIOS keyboard,
@@ -655,6 +682,37 @@ void gm_pump(void)
  * ------------------------------------------------------------------------------------------- */
 void gm_mouse_show(int16_t on) { mouse_shown = on; }
 
+#ifdef __EMSCRIPTEN__
+/* The pointer in canvas pixels (the canvas buffer is what raylib draws into), 0 until the pointer has been over the page */
+EM_JS(int, gm_js_pointer_x, (void), {
+  if (!Module.gmPtr) {
+    var st = Module.gmPtr = { x: 0, y: 0, seen: false };
+    window.addEventListener('pointermove', function (e) {
+      if (!document.pointerLockElement) { st.x = e.clientX; st.y = e.clientY; st.seen = true; }
+    }, true);
+    /* captured: the pointer itself does not move, the movement is added up. mousemove rather than pointermove, which Firefox
+     * does not send while the pointer is locked. */
+    window.addEventListener('mousemove', function (e) {
+      if (document.pointerLockElement) { st.x += e.movementX; st.y += e.movementY; st.seen = true; }
+    }, true);
+  }
+  var st = Module.gmPtr, c = Module.canvas || document.getElementById('canvas');
+  if (!st.seen || !c) return -1;
+  var r = c.getBoundingClientRect();
+  Module.gmPtrY = (st.y - r.top) * c.height / r.height;
+  return Math.round((st.x - r.left) * c.width / r.width * 16);
+});
+EM_JS(int, gm_js_pointer_y, (void), { return Math.round((Module.gmPtrY || 0) * 16); });
+EM_JS(int, gm_js_locked, (void), { return document.pointerLockElement ? 1 : 0; });
+static int gm_web_pointer(float *x, float *y)
+{
+    int ix = gm_js_pointer_x();
+    if (ix < 0) return 0;
+    *x = ix / 16.0f; *y = gm_js_pointer_y() / 16.0f;
+    return 1;
+}
+#endif
+
 static int32_t headless_mx, headless_my, headless_buttons;     /* headless: the pointer stays where the engine last put it, like a still mouse */
 
 void gm_mouse_get(int32_t *vx, int32_t *vy, int32_t *buttons)
@@ -663,6 +721,24 @@ void gm_mouse_get(int32_t *vx, int32_t *vy, int32_t *buttons)
     if (!window_open) { *vx = *vy = *buttons = 0; return; }
     Vector2 p = GetMousePosition();
     float s = (float)GetRenderWidth() / (float)GetScreenWidth();   /* DPI scale: render px per logical px */
+#ifdef __EMSCRIPTEN__
+    {   /* raylib's browser pointer is scaled by the window size GLFW remembers from InitWindow (960x720), not by the canvas
+         * that fills the page, so it moves slower than the mouse. The page knows where the pointer really is. */
+        float wx, wy;
+        if (gm_web_pointer(&wx, &wy)) { p.x = wx / s; p.y = wy / s; }
+        int lock = gm_js_locked();                      /* the page captured the mouse (pointer lock) */
+        if (lock && !captured) { captured = 1; cap_x = cap_rx = p.x; cap_y = cap_ry = p.y; }
+        else if (!lock && captured) captured = 0;
+    }
+#endif
+    if (captured) {                                    /* add up the movement; the host cursor is not shown */
+        cap_x += p.x - cap_rx; cap_y += p.y - cap_ry;
+        cap_rx = p.x; cap_ry = p.y;
+        float lx = game_rect.x / s, hx = (game_rect.x + game_rect.w) / s, ly = game_rect.y / s, hy = (game_rect.y + game_rect.h) / s;
+        cap_x = cap_x < lx ? lx : (cap_x > hx ? hx : cap_x);
+        cap_y = cap_y < ly ? ly : (cap_y > hy ? hy : cap_y);
+        p.x = cap_x; p.y = cap_y;
+    }
     float nx = (p.x * s - game_rect.x) / game_rect.w, ny = (p.y * s - game_rect.y) / game_rect.h;
     nx = nx < 0 ? 0 : (nx > 1 ? 1 : nx);
     ny = ny < 0 ? 0 : (ny > 1 ? 1 : ny);
@@ -677,7 +753,9 @@ void gm_mouse_set(int32_t vx, int32_t vy)
     if (headless) { headless_mx = vx; headless_my = vy; return; }
     if (!window_open) return;
     float s = (float)GetRenderWidth() / (float)GetScreenWidth();
-    SetMousePosition((int)((game_rect.x + vx / 639.0f * game_rect.w) / s), (int)((game_rect.y + vy / 199.0f * game_rect.h) / s));
+    float tx = (game_rect.x + vx / 639.0f * game_rect.w) / s, ty = (game_rect.y + vy / 199.0f * game_rect.h) / s;
+    if (captured) { cap_x = tx; cap_y = ty; return; }  /* the host pointer is not shown, nothing to move */
+    SetMousePosition((int)tx, (int)ty);
 }
 
 /* ---------------------------------------------------------------------------------------------

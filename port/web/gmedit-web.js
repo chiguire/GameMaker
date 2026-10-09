@@ -255,6 +255,27 @@ document.addEventListener('fullscreenchange', () => {
   $('btn-full').textContent = on ? 'Leave full screen' : 'Full screen';
   if (current) current.canvas.focus();
 });
+// mouse capture: the browser hides its cursor (pointer lock) and the program's own cursor is the only one; the program gets
+// the movement (dosplat.c adds it up). The browser gives the mouse back on Esc, which is also this page's way out.
+function toggleCapture() {
+  if (!current) return;
+  if (document.pointerLockElement) document.exitPointerLock();
+  else {
+    // raw movement first: with the ordinary lock some systems (remote desktops, virtual machines) stop reporting movement
+    // when the real pointer reaches the edge of the host screen, and the program's cursor would never reach its own edge
+    const c = current.canvas;
+    const plain = () => { const r2 = c.requestPointerLock(); if (r2 && r2.catch) r2.catch((err) => log('Mouse capture refused: ' + err.message, true)); };
+    let r;
+    try { r = c.requestPointerLock({ unadjustedMovement: true }); } catch (err) { plain(); return; }
+    if (r && r.catch) r.catch(plain);
+  }
+}
+$('btn-capture').onclick = (e) => { e.target.blur(); toggleCapture(); };
+document.addEventListener('pointerlockchange', () => {
+  $('btn-capture').textContent = document.pointerLockElement ? 'Release mouse' : 'Capture mouse';
+  if (current) current.canvas.focus();
+});
+window.addEventListener('keydown', (e) => { if (e.altKey && e.code === 'KeyG') { e.preventDefault(); toggleCapture(); } }, true);
 $('log-toggle').onclick = () => $('log').classList.toggle('hidden');
 
 // ---------------------------------------------------------------------------------------------------------------------

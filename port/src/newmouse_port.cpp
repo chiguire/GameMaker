@@ -67,9 +67,11 @@ static void PollMouse(void)
   if (gm_os_time() < settle_until) { lastx = vx; lasty = vy; }
   int dx = (int)(vx / 2) - (int)(lastx / 2);            // in cursor units: 320 across the picture
   int dy = (int)(vy / ystep()) - (int)(lasty / ystep());
-  lastx = vx; lasty = vy;
+  // Cursor.Move() ignores movement while the cursor is being drawn (Moving). The pointer position is only taken as the
+  // new reference once the movement has been applied, otherwise that part of the movement would be lost for good.
+  if (!Cur.Moving) { lastx = vx; lasty = vy; }
 
-  if (dx != 0 || dy != 0)
+  if ((dx != 0 || dy != 0) && !Cur.Moving)
     {
     // The original fed mickey counters to MouseClass::Change(), whose loops only end through 16-bit wrap-around when a
     // counter is cumulative, and which the DOS driver fed with raw movement. The pointer position is exact here, so
