@@ -144,6 +144,4 @@ sound editing) against DOS, put the player into the shell (Play), project import
 The editors were compared with the original DOS editors (rebuilt from the repository source) using scripted keys and mouse
 input: see `baseline/editors/README.md`. Every screen dump and saved file compared is identical (palette, block, monster, map,
 sound, integrator, image reader, utility, menu; character maker menus), including edits made with the mouse; only clock-driven
-animation fields in `.MON` are masked. Found and fixed on the way: raw NUL bytes in nine string literals. Not done: the character
-maker's graphical sequence editors, folding the mouse cases into `baseline/editors/suite.ps1`, re-running the browser build after
-the latest `dosplat.c`/`gfx_asm.cpp`/NUL changes (`build_web_editors.sh`).
+animation fields in `.MON` are masked. Found and fixed on the way: raw NUL bytes in nine string literals. The character maker's sequence editor animates on the clock and matches DOS up to phase. The web editors build was re-run after the NUL fixes and links fine (not re-tried in a browser). Left: more mouse cases in `suite.ps1` (three are in), trying the rebuilt page in a browser.

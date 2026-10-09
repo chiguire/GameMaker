@@ -7,6 +7,8 @@ $summary = @()
 foreach ($c in $cases) {
   $args = @{ Name = $c.Name; Program = $c.Program; Steps = $c.Steps; Work = $Work }
   if ($c.Args) { $args.ProgramArgs = $c.Args }
+  if ($c.Mask) { $args.Mask = $c.Mask }
+  if ($c.FileMask) { $args.FileMask = $c.FileMask }
   $out = & (Join-Path $PSScriptRoot 'runcase.ps1') @args 2>&1
   $text = ($out | Out-String).Trim()
   $last = ($out | Where-Object { $_ -match '^(all identical|\d+ difference)' } | Select-Object -Last 1)

@@ -19,5 +19,4 @@ Things the oracle taught (all in the code comments too):
 
 Status (2026-10-09): palchos, blocedit, monedit, mapmaker, charedit (menus), sndedit, grator, image, utility, menu: every screen
 dump and saved file compared so far is identical (the monster strip and 54 animation bytes are masked), including edits made
-with the mouse (palette, pixels, map painting, monster frames, sound bars, scenes, GIF cutting). Not done: the character
-maker's graphical sequence editors, the suite file (`suite.ps1`) lists the keyboard cases only; the mouse cases were run by hand.
+with the mouse (palette, pixels, map painting, monster frames, sound bars, scenes, GIF cutting). The character maker's sequence editor (Idle > Define Sequence) was reached too: its preview animates on the clock, and the per-pixel colour sequences over 24 dumps are the same in DOS and the port, shifted by the load time (so it is not a suite case; a static dump differs by a few pixels depending on the phase). The suite lists the keyboard cases and three mouse/flow cases (gam-click, img-cut, chr-flow); the other mouse cases were run by hand.

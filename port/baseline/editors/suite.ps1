@@ -32,6 +32,11 @@ function Get-Cases {
     [pscustomobject]@{ Name = 'gam-edit'; Program = 'grator'; Steps = (& $load 'sample.gam') + @('key:Enter', 'delay:90', 'dump:e0') },
     [pscustomobject]@{ Name = 'gam-save'; Program = 'grator'; Steps = (& $load 'sample.gam') + @('key:Down', 'key:Enter', 'text:x', 'key:Enter', 'delay:72', 'dump:s0') },
 
-    [pscustomobject]@{ Name = 'img-menu'; Program = 'image'; Steps = @('dump:i0', 'key:Down', 'dump:i1') }
+    [pscustomobject]@{ Name = 'img-menu'; Program = 'image'; Steps = @('dump:i0', 'key:Down', 'dump:i1') },
+
+    # mouse cases (Mouse-Start primes the DOS mouse code, see README.md)
+    [pscustomobject]@{ Name = 'gam-click'; Program = 'grator'; Steps = (& $load 'sample.gam' | Select-Object -First 0) + @('key:Enter', 'text:sample.gam', 'key:Enter', 'delay:54', 'key:Enter', 'delay:200', 'delay:6') + (Mouse-Start) + (Mouse-Click 200 60) + @('delay:36', 'dump:a1', 'delay:6') + (Mouse-Click 250 120) + @('delay:36', 'dump:a2', 'delay:6') + (Mouse-Drag 95 70 150 100 4 2) + @('delay:36', 'dump:a3', 'delay:6') + (Mouse-Click 27 20) + (Mouse-Click 150 100) + @('delay:36', 'dump:a4', 'delay:6') + (Mouse-Drag 200 62 250 118 4 2) + @('delay:36', 'dump:a5', 'delay:6') + (Mouse-Click 27 8) + @('delay:90', 'dump:t0', 'key:Enter', 'delay:72', 'text:x', 'key:Enter', 'delay:90', 'dump:t1') },
+    [pscustomobject]@{ Name = 'img-cut'; Program = 'image'; Steps = @('key:Enter', 'text:sample.gif', 'key:Enter', 'delay:200', 'key:Down', 'delay:36', 'key:Enter', 'delay:54', 'key:Enter', 'delay:90', 'delay:6') + (Mouse-Start) + (Mouse-Move 30 20) + @('delay:12', 'key:Right', 'key:Down', 'delay:36') + (Mouse-Click 40 30) + @('delay:36') + (Mouse-Move 80 10) + (Mouse-Click 80 10) + @('delay:36', 'key:Esc', 'delay:90', 'key:Enter', 'delay:90', 'text:x', 'key:Enter', 'delay:90', 'text:y', 'key:Enter', 'delay:120', 'dump:s2') },
+    [pscustomobject]@{ Name = 'chr-flow'; Program = 'charedit'; Steps = @('key:Enter', 'text:sample.chr', 'key:Enter', 'delay:54', 'key:Enter', 'text:sample.cbl', 'key:Enter', 'delay:54', 'key:Enter', 'text:sample.pal', 'key:Enter', 'delay:54', 'key:Enter', 'text:sample.snd', 'key:Enter', 'delay:54', 'key:Enter', 'delay:90', 'dump:t0', 'key:Down', 'delay:36', 'dump:t1', 'key:Enter', 'delay:90', 'dump:t2') }
   )
 }
