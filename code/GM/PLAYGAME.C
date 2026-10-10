@@ -5401,7 +5401,7 @@ uint GameClass::SceneAt(int x,int y)     { return(NOSCENE); }
 uint GameClass::CreateScene(int x,int y) { return(NOSCENE); }
 */
 
-
+
 
 #ifdef GM_PORT
 // Entry used by the port (gmplay_main.cpp): main() is renamed gm_game_main by shim/gmcompat.h
