@@ -86,6 +86,7 @@ int16_t  gm_findnext(struct ffblk *f);
 void     gm_mouse_show(int16_t on);
 void     gm_mouse_get(int32_t *vx, int32_t *vy, int32_t *buttons);
 void     gm_mouse_set(int32_t vx, int32_t vy);
+int      gm_mouse_follows_host(void);      /* web page, pointer not captured: the host pointer cannot be warped, so the cursor must follow its position */
 
 /* Gamepad as the game-port joystick: x and y 0..200 (centre 100), buttons bit 0 and 1. Centred and idle when no
  * gamepad is connected or gamepad use is switched off. */

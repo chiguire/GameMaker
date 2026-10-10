@@ -6,8 +6,10 @@
  *                                 MouseInterrupt did: move the cursor, set MouseButs and call KeyUpdate()
  *   Low256RepCols / Rep1Col / GetCols   row transfers of the DrawingBoard that TRANMOUS.HPP sets up on A000:0000
  *
- * The cursor follows the pointer of the host window. The original is relative (mickeys): when the program moves the
- * cursor itself (Cursor.Goto, Limit, joystick) the host pointer is moved along, so that the two stay together.
+ * The original is relative (mickeys). When the program moves the cursor itself (Cursor.Goto, Limit, joystick) the host
+ * pointer is moved along, so that the two stay together. A browser cannot move the pointer, and there relative movement
+ * lets the two drift apart (Limit, entering from another edge): the web page puts the cursor at the pointer instead,
+ * whenever the pointer moves (gm_mouse_follows_host).
  */
 #include "gen.h"
 #include "genclass.hpp"
@@ -65,8 +67,24 @@ static void PollMouse(void)
   static double settle_until = -1;
   if (settle_until < 0) settle_until = gm_os_time() + 0.6;
   if (gm_os_time() < settle_until) { lastx = vx; lasty = vy; }
-  int dx = (int)(vx / 2) - (int)(lastx / 2);            // in cursor units: 320 across the picture
-  int dy = (int)(vy / ystep()) - (int)(lasty / ystep());
+  bool moved = vx != lastx || vy != lasty;
+  int dx, dy;
+  if (!gm_mouse_follows_host())
+    {
+    // DOS behaviour (the oracle in baseline/editors): by movement, which Limit() clamps and loses. Native builds warp the
+    // host pointer along with the cursor, so the two stay together; captured, there is no host pointer to keep company.
+    dx = (int)(vx / 2) - (int)(lastx / 2);              // in cursor units: 320 across the picture
+    dy = (int)(vy / ystep()) - (int)(lasty / ystep());
+    }
+  else
+    {
+    // Web page: the cursor goes where the host pointer is (the same cell as gm_mouse_set aims at), whatever way the
+    // pointer came in. Movement that Limit() or an earlier poll dropped therefore cannot pile up as an offset. The pointer is only
+    // looked at when it moved, so a cursor the program moved itself (keys, joystick) stays where the program put it:
+    // a browser cannot warp the host pointer to follow.
+    dx = moved ? vx / 2 - Cur.Pos.x : 0;
+    dy = moved ? vy / ystep() - Cur.Pos.y : 0;
+    }
   // Cursor.Move() ignores movement while the cursor is being drawn (Moving). The pointer position is only taken as the
   // new reference once the movement has been applied, otherwise that part of the movement would be lost for good.
   if (!Cur.Moving) { lastx = vx; lasty = vy; }

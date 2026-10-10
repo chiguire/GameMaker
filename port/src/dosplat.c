@@ -748,6 +748,15 @@ void gm_mouse_get(int32_t *vx, int32_t *vy, int32_t *buttons)
                (IsMouseButtonDown(MOUSE_BUTTON_MIDDLE) ? 4 : 0);
 }
 
+int gm_mouse_follows_host(void)
+{
+#ifdef __EMSCRIPTEN__
+    return !headless && !captured;
+#else
+    return 0;
+#endif
+}
+
 void gm_mouse_set(int32_t vx, int32_t vy)
 {
     if (headless) { headless_mx = vx; headless_my = vy; return; }
