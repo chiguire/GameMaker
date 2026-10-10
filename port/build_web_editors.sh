@@ -1,13 +1,13 @@
 #!/bin/bash
-# Builds the GameMaker design tools (menu, utility and the seven editors) as WebAssembly and packs them with the page
+# Builds the GameMaker design tools (menu, utility, the seven editors) and the player as WebAssembly and packs them with the page
 # into a static folder (any web server) and a .zip of the same folder.
 #
 #   bash port/build_web_editors.sh [--out DIR]
 #
 #     --out DIR   output folder (default: port/web-editors); DIR.zip is written next to it
 #
-# Needs Emscripten, cmake, ninja and git, as build_web.sh does (see the top of that file). The player is not part of this
-# folder yet: the menu's "Play" tells the person to open the player page (index.html of build_web.sh) in another tab.
+# Needs Emscripten, cmake, ninja and git, as build_web.sh does (see the top of that file). The player is part of it: the
+# menu's "Play" runs it on the same page, in the same folder as the editors, so a game can be tested as soon as it is saved.
 # GM_WEB_EDITORS_BUILD_DIR changes the build folder (port/build-web-editors).
 set -e
 here=$(cd "$(dirname "$0")" && pwd)
@@ -35,7 +35,7 @@ if ! command -v emcmake >/dev/null 2>&1; then
 fi
 
 build=${GM_WEB_EDITORS_BUILD_DIR:-$here/build-web-editors}
-programs="gmmenu gmutility gmpalchos gmblocedit gmmonedit gmmapmaker gmcharedit gmimage gmsndedit gmgrator"
+programs="gmmenu gmutility gmpalchos gmblocedit gmmonedit gmmapmaker gmcharedit gmimage gmsndedit gmgrator gmplayer"
 if [ ! -f "$build/build.ninja" ]; then
   emcmake cmake -S "$here" -B "$build" -GNinja -DCMAKE_BUILD_TYPE=Release -DGM_WEB_TARGET=browser
 fi

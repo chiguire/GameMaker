@@ -319,6 +319,13 @@ static void usage()
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+#ifdef GM_PLAYER_MODULE
+extern "C" {
+#include "fb.h"
+}
+extern "C" void gm_reload_config(void);   // GENC.C
+extern "C" void gm_save_config(void);
+#endif
 // In the browser the module stays alive after the engine finishes (-sEXIT_RUNTIME=0), so that the page keeps working:
 // saving the last scores, showing the end screen, reacting to keys that arrive late. The page is told here instead.
 static void page_notify(int code)
@@ -327,7 +334,15 @@ static void page_notify(int code)
     if (done) return;
     done = true;
     gm_audio_shutdown();                              // a WebAudio node must not keep calling into a finished game
+#ifdef GM_PLAYER_MODULE
+    // The player as one more program of the design tools page (web/gmedit-web.js): same convention as the editors
+    // (gmedit_main.cpp), the window is closed and the page is told by gmProgramExited.
+    gm_save_config();
+    fb_close();
+    EM_ASM({ if (window.gmProgramExited) window.gmProgramExited($0); }, code);
+#else
     EM_ASM({ if (window.gmEngineExited) window.gmEngineExited($0); }, code);
+#endif
 }
 #endif
 
@@ -399,6 +414,9 @@ int main(int argc, char *argv[])
     args.push_back(nullptr);
 #ifdef __EMSCRIPTEN__
     atexit([] { page_notify(0); });                  // the engine also ends through exit() on some paths
+#ifdef GM_PLAYER_MODULE
+    gm_reload_config();                              // the data folder is in place now (see GENC.C)
+#endif
     int rc = (int)gm_main_entry((int32_t)args.size() - 1, args.data());
     page_notify(rc);
     return rc;

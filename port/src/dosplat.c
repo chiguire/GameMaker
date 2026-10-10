@@ -239,7 +239,10 @@ static gm_isr vectors[256];
 static int in_isr;
 
 gm_isr gm_getvect(int16_t n) { return vectors[n & 255] ? vectors[n & 255] : default_isr; }
-void gm_setvect(int16_t n, gm_isr h) { vectors[n & 255] = h; }
+/* A program saves what getvect() returned and puts it back when it is done. For a vector nobody has set that is the stub
+ * above, and it must go back as "no handler": a keyboard handler (INT 9) that does nothing would stop key presses from
+ * reaching the BIOS key buffer (see key_event) for the rest of the run, e.g. at "Hit any key" after a game. */
+void gm_setvect(int16_t n, gm_isr h) { vectors[n & 255] = h == default_isr ? NULL : h; }
 void gm_int_enable(void) {}
 void gm_int_disable(void) {}
 

@@ -89,3 +89,20 @@ add_executable(gmlaunch src/gmlaunch_main.cpp)
 set_target_properties(gmlaunch PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 add_dependencies(gmlaunch gmmenu gmutility gmpalchos gmblocedit gmmonedit gmmapmaker gmcharedit gmimage gmsndedit gmgrator)
 endif()
+
+# The player as one more program of the design tools page (web/gmedit-web.js "Play"): the same engine objects as gmplay,
+# linked like an editor (one ES module that the page starts after it has mounted the shared folder). Only the browser target.
+if(EMSCRIPTEN AND GM_WEB_TARGET STREQUAL "browser")
+  add_executable(gmplayer src/gmplay_main.cpp $<TARGET_OBJECTS:engine_objs>)
+  set_target_properties(gmplayer PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON SUFFIX ".js")
+  target_compile_definitions(gmplayer PRIVATE GM_PLAYER_MODULE=1)
+  target_link_libraries(gmplayer PRIVATE gmplat)
+  target_link_options(gmplayer PRIVATE -sASYNCIFY=1 -sASYNCIFY_STACK_SIZE=524288 -sSTACK_SIZE=2097152
+    -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=33554432 -sUSE_GLFW=3 -sASSERTIONS=1
+    -sENVIRONMENT=web -sINVOKE_RUN=0 -sFORCE_FILESYSTEM=1 -lidbfs.js
+    -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createGmProgram
+    -sINCOMING_MODULE_JS_API=arguments,canvas,noInitialRun,noExitRuntime,onAbort,onExit,onRuntimeInitialized,postRun,preRun,print,printErr,locateFile,wasmBinary,instantiateWasm,setStatus,thisProgram,ENVIRONMENT,preinitializedWebGLContext,elementPointerLock,onFullScreen
+    -sEXIT_RUNTIME=0
+    "-sEXPORTED_FUNCTIONS=_main,_gm_web_command" "-sEXPORTED_RUNTIME_METHODS=FS,callMain,HEAPF32,HEAP32,HEAPU8,HEAPU32,HEAP16,HEAPU16"
+    --pre-js ${CMAKE_CURRENT_SOURCE_DIR}/web/editor_pre.js)
+endif()

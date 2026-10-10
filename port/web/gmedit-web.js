@@ -10,11 +10,11 @@ const $ = (id) => document.getElementById(id);
 
 // GM.ASM's table: the exit code of a program is the number of the one to run next; 0 ends GameMaker.
 const PROGRAMS = ['', 'gmutility', 'gmpalchos', 'gmblocedit', 'gmmonedit', 'gmmapmaker', 'gmcharedit', 'gmimage', 'gmsndedit',
-  'gmgrator', 'gmplay', 'gmmenu'];
+  'gmgrator', 'gmplayer', 'gmmenu'];
 const QUIT = 0, PLAYGAME = 10, MENU = 11;
 const TITLES = { gmutility: 'Utilities', gmpalchos: 'Palette designer', gmblocedit: 'Block designer', gmmonedit: 'Monster maker',
   gmmapmaker: 'Map maker', gmcharedit: 'Character maker', gmimage: 'Image reader', gmsndedit: 'Sound designer',
-  gmgrator: 'Integrator', gmplay: 'Player', gmmenu: 'Main menu' };
+  gmgrator: 'Integrator', gmplayer: 'Player', gmmenu: 'Main menu' };
 
 // ---------------------------------------------------------------------------------------------------------------------
 // messages
@@ -189,23 +189,12 @@ async function runChecked(prog, args) {
   }
 }
 
-// The player is its own page for now (index.html); it plays the games that are dropped on it or bundled with it.
-function runPlayer() {
-  return new Promise((resolve) => {
-    $('stage').textContent = '';
-    show('bar', false);
-    show('cover', true);
-    $('cover').querySelector('h1').textContent = 'Play';
-    message('The player is a separate page.');
-    $('start').disabled = false;
-    $('start').textContent = 'Back to the menu';
-    $('start').onclick = () => { show('cover', false); show('bar', true); resolve(MENU); };
-    const note = document.createElement('p');
-    note.className = 'note';
-    note.id = 'play-note';
-    note.innerHTML = 'Open <a href="index.html" target="_blank" rel="noopener">the player</a> in another tab to play a game.';
-    $('cover').querySelector('.card').appendChild(note);
-  });
+// The player is one more program of this page (gmplayer, the same engine as the player page, built as a module like the
+// editors). It runs in the shared folder: its own menu lists the games in it (the sample game, and the ones made or
+// imported here), and what a game saves (scores, saved games) stays there. Whatever way it ends, the menu is next.
+async function runPlayer() {
+  const code = await runChecked(PLAYGAME, []);
+  return code < 0 ? code : MENU;
 }
 
 function finished(code) {

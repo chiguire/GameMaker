@@ -121,7 +121,12 @@ Phase 1 is done for the native and the web build, except the player inside the s
   Tried in headless Chrome (CDP): menu -> Design -> Palette designer (a second module) -> Quit -> back to the menu; a
   palette saved in one browser session is listed in the next one. Not tried: other browsers, touch, real audio, the other
   editors inside the page (they run under Node and natively).
-- The menu's "Play" shows a note: the player is still its own page (`index.html` of `build_web.sh`).
+- (2026-10-10) The player is part of the editors page now: `build_web_editors.sh` also builds `gmplayer` (the same engine
+  objects as `gmplay`, linked as an editor-style ES module, `GM_PLAYER_MODULE`), and the menu's Play runs it in the same
+  canvas and the same `/gm` folder, so a game saved by the editors can be played at once (the original "Enter game to
+  play" list shows the folders of `/gm`) and its scores stay in the folder. Tried in headless Chrome: menu -> Play -> pick
+  SAMPLE -> game -> Esc -> scores -> game menu -> Quit -> back to the main menu. The player's own page (`build_web.sh`)
+  is unchanged and still makes the distributable for visitors who only want to play.
 
 Findings of this stage worth knowing (details in the code comments):
 - On the web `exit()` does not run `atexit` (EXIT_RUNTIME=0): `gm_exit()` (dosplat.c) remembers the code and calls
@@ -137,7 +142,7 @@ Findings of this stage worth knowing (details in the code comments):
   move the next pointer movement pulls the cursor back to the pointer (as any web menu).
 
 Next (phase 2 and 3 of this plan): exercise each editor's real work (drawing, cutting a GIF into blocks, map edits,
-sound editing) against DOS, put the player into the shell (Play), project import/export and the polish list.
+sound editing) against DOS, the polish list (the player is in the shell, project import/export exist).
 
 ## Status (2026-10-09, DOS comparison)
 
