@@ -17,7 +17,7 @@ jobs:
         os: [windows-latest, ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Linux packages (raylib window and GL headers, virtual display)
         if: runner.os == 'Linux'
@@ -56,8 +56,8 @@ jobs:
   web:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: mymindstorm/setup-emsdk@v14
+      - uses: actions/checkout@v6
+      - uses: mymindstorm/setup-emsdk@v15
       - name: Packages (the native fdump tool needs raylib's desktop headers)
         run: |
           sudo apt-get update
@@ -79,12 +79,12 @@ jobs:
   web-dist:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: mymindstorm/setup-emsdk@v14
+      - uses: actions/checkout@v6
+      - uses: mymindstorm/setup-emsdk@v15
       - run: sudo apt-get update && sudo apt-get install -y ninja-build
       - name: Build and pack (one step)
         run: bash port/build_web.sh --games sample --out "$PWD/web-dist"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: gmplay-web
           path: web-dist
