@@ -33,7 +33,14 @@
   #bar { position: fixed; top: 0; left: 0; right: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 12px;
          background: rgba(12,14,20,.92); border-bottom: 1px solid var(--line); transition: opacity .2s; }
   #bar.faded { opacity: 0; pointer-events: none; }
-  #bar .name { color: var(--muted); margin-right: auto; font-size: .9rem; }
+  #bar .name { color: var(--muted); font-size: .9rem; }
+  #bar-status { margin-right: auto; font-size: .85rem; color: var(--muted); }
+  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; width: min(460px, calc(100% - 32px)); }
+  dialog::backdrop { background: #000a; }
+  dialog h2 { margin: 0 0 6px; font-size: 1.2rem; }
+  dialog p { margin: 0 0 12px; color: var(--muted); font-size: .9rem; }
+  #export-list label { display: block; padding: 4px 0; }
+  .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 </style>
 </head>
 <body>
@@ -54,9 +61,21 @@
 
 <div id="bar" class="hidden">
   <span class="name" id="program-name"></span>
+  <span id="bar-status" role="status"></span>
+  <button id="btn-export" type="button" title="Save your projects as a .zip file on your computer">Export projects</button>
+  <button id="btn-import" type="button" title="Add the projects of a .zip file (or drop the file on this page)">Import projects</button>
+  <input id="import-file" type="file" accept=".zip,application/zip" class="hidden">
   <button id="btn-capture" type="button" title="Hide the computer's mouse cursor and use only the program's own. Esc or Alt+G gives it back.">Capture mouse</button>
   <button id="btn-full" type="button">Full screen</button>
 </div>
+
+<dialog id="export-dialog">
+  <h2>Export projects</h2>
+  <p>Choose what goes into the .zip file. The sample game and the help files are not included unless you changed them. A game folder in the zip can be played in the player page.</p>
+  <div id="export-list"></div>
+  <p id="export-empty" class="hidden">Nothing to export yet: save a project in one of the editors first.</p>
+  <div class="actions"><button id="export-cancel" type="button">Cancel</button><button id="export-go" type="button" class="primary" style="font-size:1rem;padding:8px 18px">Download .zip</button></div>
+</dialog>
 
 <script type="module" src="gmedit-web.js"></script>
 </body>
