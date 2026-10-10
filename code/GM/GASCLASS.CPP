@@ -38,7 +38,7 @@ unsigned int GPFClass::Length(void)
         return(0);
       }
     }
-  return( (unsigned int) ( ((gm_ulong) cur)-((gm_ulong) PicInfo)) );
+  return( (unsigned int) ( cur-PicInfo) );
   }
 
 
